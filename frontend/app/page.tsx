@@ -270,7 +270,7 @@ export default function HomePage() {
             <button disabled={!canSubmit || loading}>{loading ? "Checking…" : "Check free shipping"}</button>
             <label>
               Monitor interval (seconds)
-              <input type="number" min={5} value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value || 5))} />
+              <input type="number" min={5} max={3600} value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value || 5))} />
             </label>
           </div>
           <div className="row">
