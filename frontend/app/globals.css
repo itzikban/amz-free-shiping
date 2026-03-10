@@ -30,6 +30,7 @@ input, select, button {
   padding: 11px 12px; font-size: 0.96rem;
 }
 button { background: linear-gradient(135deg, #6eaaff, #4f8fff); color: #061027; font-weight: 700; cursor: pointer; }
+button.secondary { background: #152645; color: var(--text); border: 1px solid var(--line); }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .result ul { margin: 12px 0 0; padding-left: 18px; }
@@ -42,6 +43,9 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 details { margin-top: 10px; }
 summary { cursor: pointer; color: var(--muted); }
 pre { margin-top: 8px; background: #0b1221; border: 1px solid var(--line); border-radius: 10px; padding: 10px; overflow: auto; font-size: .8rem; }
+h3 { margin: 0 0 10px; }
+.monitorItem { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+small { color: var(--muted); }
 
 @media (max-width: 640px) {
   .row { grid-template-columns: 1fr; }
