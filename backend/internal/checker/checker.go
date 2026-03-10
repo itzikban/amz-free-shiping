@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ type Result struct {
 	URL                 string    `json:"url"`
 	Country             string    `json:"country"`
 	CheckedAt           time.Time `json:"checked_at"`
+	PriceUSD            float64   `json:"price_usd,omitempty"`
 	FreeShipping        bool      `json:"free_shipping"`
 	FreeShippingCountry bool      `json:"free_shipping_country"`
 	Signal              string    `json:"signal"`
@@ -25,6 +27,17 @@ type Result struct {
 type Service struct {
 	Client *http.Client
 }
+
+var (
+	reBuyNewText          = regexp.MustCompile(`(?is)buy\s*new[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	reOneTimePurchaseText = regexp.MustCompile(`(?is)one[- ]time\s*purchase[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	rePriceToPayText      = regexp.MustCompile(`(?is)price\s*to\s*pay[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	rePriceToPayJSON      = regexp.MustCompile(`(?is)"pricetopay"\s*:\s*\{[^\}]*"priceamount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`)
+	reOurPriceJSON        = regexp.MustCompile(`(?is)"ourprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`)
+	reDealPriceJSON       = regexp.MustCompile(`(?is)"dealprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`)
+	reAOffscreen          = regexp.MustCompile(`(?is)a-offscreen">\s*\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*<`)
+	reAnyUSD              = regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+)
 
 func New() *Service {
 	return &Service{Client: &http.Client{Timeout: 20 * time.Second}}
@@ -89,6 +102,7 @@ func AnalyzeHTML(url, country, html string) Result {
 	}
 
 	res := Result{URL: url, Country: country, CheckedAt: time.Now().UTC()}
+	res.PriceUSD = extractUSDPrice(html)
 
 	captchaSignals := []string{"opfcaptcha", "validatecaptcha", "automated access to amazon data", "enter the characters you see below"}
 	for _, c := range captchaSignals {
@@ -150,4 +164,101 @@ func AnalyzeHTML(url, country, html string) Result {
 		res.Signal = "no_free_shipping_signal"
 	}
 	return res
+}
+
+func extractUSDPrice(html string) float64 {
+	lower := strings.ToLower(html)
+
+	// 0) Explicit textual anchors first
+	for _, re := range []*regexp.Regexp{reBuyNewText, reOneTimePurchaseText, rePriceToPayText} {
+		m := re.FindStringSubmatch(lower)
+		if len(m) >= 2 {
+			n := strings.ReplaceAll(m[1], ",", "")
+			if v, err := strconv.ParseFloat(n, 64); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	// 1) Strong structured signals first (Amazon JSON blobs)
+	for _, re := range []*regexp.Regexp{rePriceToPayJSON, reOurPriceJSON, reDealPriceJSON} {
+		m := re.FindStringSubmatch(lower)
+		if len(m) >= 2 {
+			if v, err := strconv.ParseFloat(m[1], 64); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	// 2) Common buy-box markup (<span class="a-offscreen">$xx.xx</span>) near buy new/price
+	offs := reAOffscreen.FindAllStringSubmatchIndex(lower, -1)
+	bestOff := 0.0
+	bestScore := -999
+	for _, m := range offs {
+		start, end := m[0], m[1]
+		g1s, g1e := m[2], m[3]
+		n := strings.ReplaceAll(lower[g1s:g1e], ",", "")
+		v, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			continue
+		}
+		left := start - 180
+		if left < 0 {
+			left = 0
+		}
+		right := end + 180
+		if right > len(lower) {
+			right = len(lower)
+		}
+		ctx := lower[left:right]
+		s := 0
+		if strings.Contains(ctx, "buy new") || strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "priceblock") {
+			s += 8
+		}
+		if strings.Contains(ctx, "a-price") {
+			s += 3
+		}
+		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ") || strings.Contains(ctx, "shipping") || strings.Contains(ctx, "over $") {
+			s -= 6
+		}
+		if s > bestScore || (s == bestScore && (bestOff == 0 || v < bestOff)) {
+			bestScore, bestOff = s, v
+		}
+	}
+	if bestOff > 0 && bestScore >= 2 {
+		return bestOff
+	}
+
+	// 3) Fallback heuristic scan
+	idxs := reAnyUSD.FindAllStringSubmatchIndex(lower, -1)
+	if len(idxs) == 0 {
+		return 0
+	}
+	type cand struct{ value float64; score int }
+	cands := make([]cand, 0, len(idxs))
+	for _, m := range idxs {
+		start, end := m[0], m[1]
+		g1s, g1e := m[2], m[3]
+		n := strings.ReplaceAll(lower[g1s:g1e], ",", "")
+		v, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			continue
+		}
+		left := start - 120
+		if left < 0 { left = 0 }
+		right := end + 120
+		if right > len(lower) { right = len(lower) }
+		ctx := lower[left:right]
+		score := 0
+		if strings.Contains(ctx, "buy new") || strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "ourprice") || strings.Contains(ctx, "dealprice") { score += 6 }
+		if strings.Contains(ctx, "one-time purchase") { score += 3 }
+		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ounce") || strings.Contains(ctx, "shipping") || strings.Contains(ctx, "coupon") || strings.Contains(ctx, "over $") { score -= 6 }
+		cands = append(cands, cand{value:v, score:score})
+	}
+	if len(cands) == 0 { return 0 }
+	best := cands[0]
+	for _, c := range cands[1:] {
+		if c.score > best.score || (c.score == best.score && c.value < best.value) { best = c }
+	}
+	return best.value
 }

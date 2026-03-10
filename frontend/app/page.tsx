@@ -9,14 +9,44 @@ type FormState = {
   zip: string;
 };
 
+type Monitor = {
+  id: string;
+  url: string;
+  country: string;
+  zip?: string;
+  interval_seconds: number;
+  max_runs: number;
+  runs_done: number;
+  running: boolean;
+  last_checked_at?: string;
+  last_status?: boolean;
+  last_signal?: string;
+  last_method?: string;
+  last_price_usd?: number;
+  history: Array<{
+    at: string;
+    price_usd?: number;
+    free_shipping: boolean;
+    free_shipping_country: boolean;
+    signal: string;
+    method: string;
+  }>;
+};
+
+type Notification = { monitor_id: string; at: string; message: string };
+
 const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
 
 export default function HomePage() {
   const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "US", zip: "10013" });
+  const [intervalSec, setIntervalSec] = useState(20);
   const [loading, setLoading] = useState(false);
+  const [maxRuns, setMaxRuns] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
   const [health, setHealth] = useState<"checking" | "up" | "down">("checking");
+  const [monitors, setMonitors] = useState<Monitor[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -48,6 +78,116 @@ export default function HomePage() {
     }
   }
 
+  async function refreshMonitorData() {
+    const [mRes, nRes] = await Promise.allSettled([fetch("/api/monitor/list"), fetch("/api/monitor/notifications")]);
+
+    if (mRes.status === "fulfilled") {
+      if (mRes.value.ok) {
+        const mb = await mRes.value.json();
+        setMonitors(mb.monitors || []);
+      }
+    } else {
+      console.error("monitor/list failed", mRes.reason);
+    }
+
+    if (nRes.status === "fulfilled") {
+      if (nRes.value.ok) {
+        const nb = await nRes.value.json();
+        setNotifications(nb.notifications || []);
+      }
+    } else {
+      console.error("monitor/notifications failed", nRes.reason);
+    }
+  }
+
+  async function startMonitor() {
+    if (!canSubmit) return;
+    const payload = {
+      url: form.url,
+      country: form.country,
+      zip: form.country === "US" ? form.zip.trim() : "",
+      interval_seconds: intervalSec,
+      max_runs: maxRuns,
+    };
+    try {
+      const res = await fetch("/api/monitor/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setError(null);
+        await refreshMonitorData();
+        return;
+      }
+      try {
+        const body = await res.json();
+        setError(body?.error || "Failed to start monitor");
+      } catch {
+        setError("Failed to start monitor");
+      }
+    } catch {
+      setError("Network error while starting monitor");
+    }
+  }
+
+  async function stopMonitor(id: string) {
+    try {
+      const res = await fetch(`/api/monitor/stop?id=${encodeURIComponent(id)}`, { method: "POST" });
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          setError(body?.error || "Failed to stop monitor");
+        } catch {
+          setError("Failed to stop monitor");
+        }
+        return;
+      }
+      setError(null);
+      await refreshMonitorData();
+    } catch {
+      setError("Network error while stopping monitor");
+    }
+  }
+
+  async function clearMonitors() {
+    try {
+      const res = await fetch("/api/monitor/clear", { method: "DELETE" });
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          setError(body?.error || "Failed to clear monitors");
+        } catch {
+          setError("Failed to clear monitors");
+        }
+        return;
+      }
+      setError(null);
+      await refreshMonitorData();
+    } catch {
+      setError("Network error while clearing monitors");
+    }
+  }
+
+  async function clearNotifications() {
+    try {
+      const res = await fetch("/api/monitor/notifications", { method: "DELETE" });
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          setError(body?.error || "Failed to reset notifications");
+        } catch {
+          setError("Failed to reset notifications");
+        }
+        return;
+      }
+      setError(null);
+      await refreshMonitorData();
+    } catch {
+      setError("Network error while resetting notifications");
+    }
+  }
+
   useEffect(() => {
     let active = true;
     const run = () => {
@@ -60,10 +200,11 @@ export default function HomePage() {
           if (!active) return;
           setHealth("down");
         });
+      refreshMonitorData();
     };
 
     run();
-    const id = setInterval(run, 8000);
+    const id = setInterval(run, 5000);
     return () => {
       active = false;
       clearInterval(id);
@@ -125,8 +266,21 @@ export default function HomePage() {
             </label>
           </div>
 
-          <button disabled={!canSubmit || loading}>
-            {loading ? "Checking…" : "Check free shipping"}
+          <div className="row">
+            <button disabled={!canSubmit || loading}>{loading ? "Checking…" : "Check free shipping"}</button>
+            <label>
+              Monitor interval (seconds)
+              <input type="number" min={5} max={3600} value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value || 5))} />
+            </label>
+          </div>
+          <div className="row">
+            <label>
+              Max runs (auto-stop)
+              <input type="number" min={1} value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value || 1))} />
+            </label>
+          </div>
+          <button type="button" className="secondary" onClick={startMonitor} disabled={!canSubmit}>
+            Start monitor (cron test)
           </button>
         </form>
       </section>
@@ -144,24 +298,13 @@ export default function HomePage() {
                 <p className="hint">Generic free-shipping text was found, but not confirmed for selected destination.</p>
               )}
               <ul>
-                <li>
-                  <strong>Country:</strong> {result.country}
-                </li>
-                <li>
-                  <strong>free_shipping (generic):</strong> {String(result.free_shipping)}
-                </li>
-                <li>
-                  <strong>free_shipping_country (strict):</strong> {String(result.free_shipping_country)}
-                </li>
-                <li>
-                  <strong>Signal:</strong> {result.signal}
-                </li>
-                <li>
-                  <strong>Method:</strong> {result.method}
-                </li>
-                <li>
-                  <strong>Checked:</strong> {new Date(result.checked_at).toLocaleString()}
-                </li>
+                <li><strong>Country:</strong> {result.country}</li>
+                <li><strong>Price (USD):</strong> {result.price_usd ? `$${result.price_usd.toFixed(2)}` : "-"}</li>
+                <li><strong>free_shipping (generic):</strong> {String(result.free_shipping)}</li>
+                <li><strong>free_shipping_country (strict):</strong> {String(result.free_shipping_country)}</li>
+                <li><strong>Signal:</strong> {result.signal}</li>
+                <li><strong>Method:</strong> {result.method}</li>
+                <li><strong>Checked:</strong> {new Date(result.checked_at).toLocaleString()}</li>
               </ul>
               <details>
                 <summary>Raw backend response</summary>
@@ -171,6 +314,64 @@ export default function HomePage() {
           )}
         </section>
       )}
+
+      <section className="card">
+        <div className="row actionsRow">
+          <h3>Monitoring test (US/IL + cron + UI notify)</h3>
+          <button className="secondary" onClick={clearMonitors}>Clear old monitors</button>
+        </div>
+        <ul>
+          {monitors.length === 0 && <li>No active monitors yet.</li>}
+          {monitors.map((m) => (
+            <li key={m.id} className="monitorItem">
+              <div>
+                <strong>{m.country}</strong> · every {m.interval_seconds}s · runs {m.runs_done ?? 0}/{m.max_runs ?? 0} · {m.running ? "running" : "stopped"}
+                <br />
+                <small>{m.url}</small>
+                <br />
+                <small>
+                  last checked: {m.last_checked_at ? new Date(m.last_checked_at).toLocaleTimeString() : "-"} · status: {m.last_status == null ? "-" : m.last_status ? "✅" : "❌"} · price: {m.last_price_usd ? `$${m.last_price_usd.toFixed(2)}` : "-"}
+                </small>
+                {m.last_signal && <small> · signal: {m.last_signal}</small>}
+              </div>
+              <div>
+                {m.running && (
+                  <button className="secondary" onClick={() => stopMonitor(m.id)}>
+                    Stop
+                  </button>
+                )}
+                {m.history?.length > 0 && (
+                  <details>
+                    <summary>History</summary>
+                    <ul>
+                      {m.history.slice(0, 5).map((h, idx) => (
+                        <li key={idx}>
+                          {new Date(h.at).toLocaleTimeString()} · price {h.price_usd ? `$${h.price_usd.toFixed(2)}` : "-"} · strict {String(h.free_shipping_country)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="card">
+        <div className="row actionsRow">
+          <h3>UI notifications (test mode)</h3>
+          <button className="secondary" onClick={clearNotifications}>Reset notifications</button>
+        </div>
+        <ul>
+          {notifications.length === 0 && <li>No notifications yet.</li>}
+          {notifications.slice(0, 10).map((n, i) => (
+            <li key={`${n.monitor_id}-${i}`}>
+              🔔 {new Date(n.at).toLocaleTimeString()} · {n.message}
+            </li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }
