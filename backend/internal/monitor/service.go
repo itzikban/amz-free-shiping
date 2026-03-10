@@ -175,3 +175,19 @@ func (s *Service) Notifications() []Notification {
 	copy(cp, s.notifications)
 	return cp
 }
+
+func (s *Service) ClearMonitors() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, c := range s.cancels {
+		c()
+		delete(s.cancels, id)
+	}
+	s.monitors = map[string]*Monitor{}
+}
+
+func (s *Service) ClearNotifications() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.notifications = []Notification{}
+}

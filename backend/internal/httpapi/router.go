@@ -70,7 +70,21 @@ func NewRouter() http.Handler {
 	})
 
 	mux.HandleFunc("/monitor/notifications", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			msvc.ClearNotifications()
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"notifications": msvc.Notifications()})
+	})
+
+	mux.HandleFunc("/monitor/clear", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		msvc.ClearMonitors()
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
 	return mux

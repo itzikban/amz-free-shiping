@@ -114,6 +114,16 @@ export default function HomePage() {
     await refreshMonitorData();
   }
 
+  async function clearMonitors() {
+    await fetch("/api/monitor/clear", { method: "DELETE" });
+    await refreshMonitorData();
+  }
+
+  async function clearNotifications() {
+    await fetch("/api/monitor/notifications", { method: "DELETE" });
+    await refreshMonitorData();
+  }
+
   useEffect(() => {
     let active = true;
     const run = () => {
@@ -241,13 +251,16 @@ export default function HomePage() {
       )}
 
       <section className="card">
-        <h3>Monitoring test (US/IL + cron + UI notify)</h3>
+        <div className="row actionsRow">
+          <h3>Monitoring test (US/IL + cron + UI notify)</h3>
+          <button className="secondary" onClick={clearMonitors}>Clear old monitors</button>
+        </div>
         <ul>
           {monitors.length === 0 && <li>No active monitors yet.</li>}
           {monitors.map((m) => (
             <li key={m.id} className="monitorItem">
               <div>
-                <strong>{m.country}</strong> · every {m.interval_seconds}s · runs {m.runs_done}/{m.max_runs} · {m.running ? "running" : "stopped"}
+                <strong>{m.country}</strong> · every {m.interval_seconds}s · runs {m.runs_done ?? 0}/{m.max_runs ?? 0} · {m.running ? "running" : "stopped"}
                 <br />
                 <small>{m.url}</small>
                 <br />
@@ -267,7 +280,10 @@ export default function HomePage() {
       </section>
 
       <section className="card">
-        <h3>UI notifications (test mode)</h3>
+        <div className="row actionsRow">
+          <h3>UI notifications (test mode)</h3>
+          <button className="secondary" onClick={clearNotifications}>Reset notifications</button>
+        </div>
         <ul>
           {notifications.length === 0 && <li>No notifications yet.</li>}
           {notifications.slice(0, 10).map((n, i) => (

@@ -46,6 +46,8 @@ pre { margin-top: 8px; background: #0b1221; border: 1px solid var(--line); borde
 h3 { margin: 0 0 10px; }
 .monitorItem { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
 small { color: var(--muted); }
+.actionsRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.actionsRow h3 { margin: 0; }
 
 @media (max-width: 640px) {
   .row { grid-template-columns: 1fr; }
