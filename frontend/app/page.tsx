@@ -15,6 +15,8 @@ type Monitor = {
   country: string;
   zip?: string;
   interval_seconds: number;
+  max_runs: number;
+  runs_done: number;
   running: boolean;
   last_checked_at?: string;
   last_status?: boolean;
@@ -37,6 +39,7 @@ export default function HomePage() {
   const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "US", zip: "10013" });
   const [intervalSec, setIntervalSec] = useState(20);
   const [loading, setLoading] = useState(false);
+  const [maxRuns, setMaxRuns] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
   const [health, setHealth] = useState<"checking" | "up" | "down">("checking");
@@ -96,6 +99,7 @@ export default function HomePage() {
       country: form.country,
       zip: form.country === "US" ? form.zip : "",
       interval_seconds: intervalSec,
+      max_runs: maxRuns,
     };
     const res = await fetch("/api/monitor/start", {
       method: "POST",
@@ -195,6 +199,12 @@ export default function HomePage() {
               <input type="number" min={5} value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value || 5))} />
             </label>
           </div>
+          <div className="row">
+            <label>
+              Max runs (auto-stop)
+              <input type="number" min={1} value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value || 1))} />
+            </label>
+          </div>
           <button type="button" className="secondary" onClick={startMonitor} disabled={!canSubmit}>
             Start monitor (cron test)
           </button>
@@ -237,7 +247,7 @@ export default function HomePage() {
           {monitors.map((m) => (
             <li key={m.id} className="monitorItem">
               <div>
-                <strong>{m.country}</strong> · every {m.interval_seconds}s · {m.running ? "running" : "stopped"}
+                <strong>{m.country}</strong> · every {m.interval_seconds}s · runs {m.runs_done}/{m.max_runs} · {m.running ? "running" : "stopped"}
                 <br />
                 <small>{m.url}</small>
                 <br />

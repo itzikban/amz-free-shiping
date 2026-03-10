@@ -30,6 +30,8 @@ type Monitor struct {
 	Country         string        `json:"country"`
 	ZIP             string        `json:"zip,omitempty"`
 	IntervalSeconds int           `json:"interval_seconds"`
+	MaxRuns         int           `json:"max_runs"`
+	RunsDone        int           `json:"runs_done"`
 	Running         bool          `json:"running"`
 	LastCheckedAt   *time.Time    `json:"last_checked_at,omitempty"`
 	LastStatus      *bool         `json:"last_status,omitempty"`
@@ -43,6 +45,7 @@ type StartReq struct {
 	Country         string `json:"country"`
 	ZIP             string `json:"zip"`
 	IntervalSeconds int    `json:"interval_seconds"`
+	MaxRuns         int    `json:"max_runs"`
 }
 
 type Service struct {
@@ -67,8 +70,11 @@ func (s *Service) Start(ctx context.Context, r StartReq) (*Monitor, error) {
 	if r.IntervalSeconds <= 0 {
 		r.IntervalSeconds = 30
 	}
+	if r.MaxRuns <= 0 {
+		r.MaxRuns = 10
+	}
 	id := uuid.NewString()
-	m := &Monitor{ID: id, URL: r.URL, Country: r.Country, ZIP: r.ZIP, IntervalSeconds: r.IntervalSeconds, Running: true, History: []HistoryItem{}}
+	m := &Monitor{ID: id, URL: r.URL, Country: r.Country, ZIP: r.ZIP, IntervalSeconds: r.IntervalSeconds, MaxRuns: r.MaxRuns, RunsDone: 0, Running: true, History: []HistoryItem{}}
 
 	mctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
@@ -119,6 +125,7 @@ func (s *Service) loop(ctx context.Context, id string) {
 			m.LastStatus = &status
 			m.LastSignal = res.Signal
 			m.LastMethod = res.Method
+			m.RunsDone++
 			m.History = append([]HistoryItem{{At: at, FreeShipping: res.FreeShipping, FreeShippingCountry: res.FreeShippingCountry, Signal: res.Signal, Method: res.Method}}, m.History...)
 			if len(m.History) > 20 {
 				m.History = m.History[:20]
@@ -129,7 +136,11 @@ func (s *Service) loop(ctx context.Context, id string) {
 					s.notifications = s.notifications[:100]
 				}
 			}
+			stopNow := m.RunsDone >= m.MaxRuns
 			s.mu.Unlock()
+			if stopNow {
+				s.Stop(id)
+			}
 		}
 	}
 }
