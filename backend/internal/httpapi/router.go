@@ -7,12 +7,14 @@ import (
 
 	"free-ship-checker-go/internal/checker"
 	"free-ship-checker-go/internal/monitor"
+	"free-ship-checker-go/internal/userpanel"
 )
 
 func NewRouter() http.Handler {
 	mux := http.NewServeMux()
 	svc := checker.New()
 	msvc := monitor.New(svc)
+	usvc := userpanel.New(svc)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -102,6 +104,51 @@ func NewRouter() http.Handler {
 		}
 		msvc.ClearMonitors()
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	})
+
+	mux.HandleFunc("/v1/me", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		writeJSON(w, http.StatusOK, usvc.Me())
+	})
+
+	mux.HandleFunc("/v1/me/tracked-items", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			writeJSON(w, http.StatusOK, map[string]any{"items": usvc.ListItems()})
+			return
+		}
+		if r.Method == http.MethodPost {
+			var req userpanel.AddTrackedItemReq
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+				return
+			}
+			if req.URL == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "url is required"})
+				return
+			}
+			if req.Country == "" {
+				req.Country = "US"
+			}
+			item, err := usvc.AddTrackedItem(r.Context(), req)
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, item)
+			return
+		}
+		methodNotAllowed(w, http.MethodGet, http.MethodPost)
+	})
+
+	mux.HandleFunc("/v1/me/alerts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"alerts": usvc.ListAlerts()})
 	})
 
 	return mux

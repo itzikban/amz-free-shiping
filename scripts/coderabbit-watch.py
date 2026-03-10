@@ -34,9 +34,8 @@ def save_state(state):
 
 def log(msg):
     ts = datetime.now(timezone.utc).isoformat()
-    line = f"[{ts}] {msg}\n"
     with open(LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(line)
+        f.write(f"[{ts}] {msg}\n")
 
 
 def latest_coderabbit_review(pr_number: str):
@@ -53,8 +52,53 @@ def latest_coderabbit_review(pr_number: str):
     return None
 
 
+def latest_coderabbit_issue_comment(pr_number: str):
+    comments = run_json(["gh", "api", f"/repos/itzikban/amz-free-shiping/issues/{pr_number}/comments"])
+    for c in reversed(comments):
+        user = (c.get("user") or {}).get("login", "").lower()
+        body = (c.get("body") or "")
+        if "coderabbit" in user or "coderabbit" in body.lower():
+            return {
+                "id": c.get("id"),
+                "created_at": c.get("created_at"),
+                "body": body,
+            }
+    return None
+
+
+def coderabbit_inline_comments(pr_number: str):
+    comments = run_json(["gh", "api", f"/repos/itzikban/amz-free-shiping/pulls/{pr_number}/comments"])
+    out = []
+    for c in comments:
+        user = (c.get("user") or {}).get("login", "").lower()
+        if "coderabbit" not in user:
+            continue
+        out.append({
+            "id": c.get("id"),
+            "path": c.get("path"),
+            "line": c.get("line"),
+            "created_at": c.get("created_at"),
+            "body": c.get("body") or "",
+        })
+    return out
+
+
+def parse_iso(ts: str):
+    if not ts:
+        return None
+    return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+
+
 def parse_actionable_count(review_body: str):
     m = re.search(r"Actionable comments posted:\s*(\d+)", review_body or "", flags=re.I)
+    if not m:
+        return None
+    return int(m.group(1))
+
+
+def parse_confirmed_fixed_count(issue_comment_body: str):
+    # CodeRabbit often writes: "All N previously confirmed fixes remain in place"
+    m = re.search(r"all\s+(\d+)\s+previously\s+confirmed\s+fixes", issue_comment_body or "", flags=re.I)
     if not m:
         return None
     return int(m.group(1))
@@ -63,13 +107,8 @@ def parse_actionable_count(review_body: str):
 def main():
     try:
         prs = run_json([
-            "gh",
-            "pr",
-            "list",
-            "--state",
-            "open",
-            "--json",
-            "number,headRefOid,isDraft,title,url",
+            "gh", "pr", "list", "--state", "open",
+            "--json", "number,headRefOid,isDraft,title,url",
         ])
     except Exception as e:
         log(f"ERROR listing PRs: {e}")
@@ -78,7 +117,6 @@ def main():
     state = load_state()
     state.setdefault("prs", {})
 
-    triggered = []
     for pr in prs:
         if pr.get("isDraft"):
             continue
@@ -89,66 +127,104 @@ def main():
             continue
 
         prev = state["prs"].get(num, {})
-        prev_sha = prev.get("last_triggered_sha")
 
-        # Trigger CodeRabbit only when commit SHA changes.
-        if prev_sha != sha:
-            try:
-                body = "@coderabbitai review\n\nAuto-triggered by watcher: new commit detected on this PR."
-                run(["gh", "pr", "comment", num, "--body", body])
-                state["prs"][num] = {
-                    **prev,
-                    "last_triggered_sha": sha,
-                    "last_triggered_at": datetime.now(timezone.utc).isoformat(),
-                    "title": pr.get("title", ""),
-                    "url": pr.get("url", ""),
-                }
-                triggered.append(f"#{num}")
-            except Exception as e:
-                log(f"ERROR triggering PR #{num}: {e}")
-
-        # Track latest CodeRabbit review and actionable count.
+        # Gather latest CodeRabbit signals
         try:
             rev = latest_coderabbit_review(num)
-            if rev and rev.get("id"):
-                actionable = parse_actionable_count(rev.get("body", ""))
-                prev_rev_id = prev.get("last_coderabbit_review_id")
-                if prev_rev_id != rev["id"]:
-                    msg = f"PR #{num} CodeRabbit review updated"
-                    if actionable is not None:
-                        msg += f" (actionable={actionable})"
-                    log(msg)
-
-                state["prs"][num] = {
-                    **state["prs"].get(num, {}),
-                    "last_coderabbit_review_id": rev["id"],
-                    "last_coderabbit_review_at": rev.get("submitted_at"),
-                    "last_coderabbit_actionable": actionable,
-                    "title": pr.get("title", ""),
-                    "url": pr.get("url", ""),
-                }
-
-                # Reminder when review appears clean
-                if actionable == 0:
-                    log(
-                        f"MERGE-ASK REMINDER PR #{num}: CodeRabbit actionable comments are 0. "
-                        "Summarize resolved/remaining and ask user if they want to merge."
-                    )
+            cm = latest_coderabbit_issue_comment(num)
+            inline = coderabbit_inline_comments(num)
         except Exception as e:
-            log(f"ERROR reading CodeRabbit state for PR #{num}: {e}")
+            log(f"ERROR fetching CodeRabbit data PR #{num}: {e}")
+            continue
 
-    # Prune closed PR state
+        rev_id = (rev or {}).get("id")
+        cm_id = (cm or {}).get("id")
+        actionable = parse_actionable_count((rev or {}).get("body", "")) if rev else None
+        confirmed_fixed = parse_confirmed_fixed_count((cm or {}).get("body", "")) if cm else None
+
+        # Inline fingerprint: detect unseen bot inline comments (might be missed by summary)
+        inline_ids = [x["id"] for x in inline]
+        inline_fp = f"{len(inline_ids)}:{inline_ids[-1] if inline_ids else 0}"
+
+        changed_activity = (
+            prev.get("last_coderabbit_review_id") != rev_id
+            or prev.get("last_coderabbit_comment_id") != cm_id
+            or prev.get("last_inline_fingerprint") != inline_fp
+        )
+
+        if changed_activity:
+            log(f"PR #{num} CodeRabbit activity updated (actionable={actionable}, inline={len(inline_ids)})")
+            prev["pending_since"] = None
+            prev["retrigger_count"] = 0
+            prev["escalated"] = False
+
+        # SHA-gated retrigger: only retrigger if current SHA wasn't requested yet
+        last_requested_sha = prev.get("last_requested_review_sha")
+        now = datetime.now(timezone.utc)
+
+        # determine if still pending unresolved work
+        pending_unresolved = False
+        if actionable is not None and actionable > 0:
+            pending_unresolved = True
+        elif actionable is None and inline_ids:
+            # fallback: if no actionable summary but inline comments exist, treat as pending
+            pending_unresolved = True
+
+        if pending_unresolved:
+            if not prev.get("pending_since"):
+                prev["pending_since"] = now.isoformat()
+            pending_since = parse_iso(prev.get("pending_since")) or now
+            elapsed = (now - pending_since).total_seconds()
+            retrigger_count = int(prev.get("retrigger_count") or 0)
+
+            if elapsed >= 120 and retrigger_count < 1 and last_requested_sha != sha:
+                try:
+                    body = (
+                        "@coderabbitai review\n\n"
+                        "Auto-retrigger (SHA-gated): unresolved findings detected and this commit SHA has not been requested yet."
+                    )
+                    run(["gh", "pr", "comment", num, "--body", body])
+                    prev["retrigger_count"] = retrigger_count + 1
+                    prev["last_requested_review_sha"] = sha
+                    prev["last_requested_review_at"] = now.isoformat()
+                    log(f"PR #{num} retriggered CodeRabbit on new SHA {sha[:12]}")
+                except Exception as e:
+                    log(f"ERROR retriggering PR #{num}: {e}")
+
+            if elapsed >= 300 and not prev.get("escalated"):
+                log(f"ESCALATION PR #{num}: unresolved findings for 5+ minutes (actionable={actionable}, inline={len(inline_ids)})")
+                prev["escalated"] = True
+        else:
+            prev["pending_since"] = None
+            prev["retrigger_count"] = 0
+            prev["escalated"] = False
+
+        prev.update({
+            "title": pr.get("title", ""),
+            "url": pr.get("url", ""),
+            "last_head_sha": sha,
+            "last_coderabbit_review_id": rev_id,
+            "last_coderabbit_review_at": (rev or {}).get("submitted_at"),
+            "last_coderabbit_actionable": actionable,
+            "last_coderabbit_comment_id": cm_id,
+            "last_coderabbit_comment_at": (cm or {}).get("created_at"),
+            "last_coderabbit_confirmed_fixed": confirmed_fixed,
+            "last_inline_fingerprint": inline_fp,
+            "last_inline_count": len(inline_ids),
+        })
+        state["prs"][num] = prev
+
+        if actionable == 0:
+            log(
+                f"MERGE-ASK REMINDER PR #{num}: actionable=0. Summarize resolved/remaining and ask user if they want merge."
+            )
+
     open_nums = {str(pr["number"]) for pr in prs}
     for k in list(state["prs"].keys()):
         if k not in open_nums:
             del state["prs"][k]
 
     save_state(state)
-
-    if triggered:
-        log(f"Triggered CodeRabbit review for: {', '.join(triggered)}")
-    else:
-        log("No new commits on open PRs; no trigger needed")
 
     reminder = (
         "REMINDER: After resolving CodeRabbit comments, summarize resolved/remaining "
