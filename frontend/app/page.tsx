@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CheckResponse } from "@/lib/types";
 
 type FormState = {
@@ -62,6 +62,7 @@ export default function HomePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [userItems, setUserItems] = useState<UserTrackedItem[]>([]);
   const [userAlerts, setUserAlerts] = useState<UserAlert[]>([]);
+  const refreshSeqRef = useRef(0);
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -94,22 +95,26 @@ export default function HomePage() {
   }
 
   async function refreshUserPanel() {
+    const seq = ++refreshSeqRef.current;
     const [meRes, itemsRes, alertsRes] = await Promise.allSettled([
       fetch('/api/v1/me'),
       fetch('/api/v1/me/tracked-items'),
       fetch('/api/v1/me/alerts'),
     ]);
 
+    if (seq !== refreshSeqRef.current) return;
+
     if (meRes.status === 'fulfilled' && meRes.value.ok) {
-      setMe(await meRes.value.json());
+      const meBody = await meRes.value.json();
+      if (seq === refreshSeqRef.current) setMe(meBody);
     }
     if (itemsRes.status === 'fulfilled' && itemsRes.value.ok) {
       const b = await itemsRes.value.json();
-      setUserItems(b.items || []);
+      if (seq === refreshSeqRef.current) setUserItems(b.items || []);
     }
     if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
       const b = await alertsRes.value.json();
-      setUserAlerts(b.alerts || []);
+      if (seq === refreshSeqRef.current) setUserAlerts(b.alerts || []);
     }
   }
 
