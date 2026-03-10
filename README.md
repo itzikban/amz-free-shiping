@@ -7,11 +7,12 @@ This repository is structured as a **monorepo** for multiple services.
 ## Current layout
 
 - `backend/` — Go backend service (free-shipping checker API)
+- `frontend/` — Next.js responsive web app
 
-## Planned layout
+## Planned expansion
 
 - `backend/` — API + workers + schedulers
-- `frontend/` — web app/dashboard
+- `frontend/` — dashboard + user flows
 - additional services as needed (`services/*`)
 
 ## Backend quick start

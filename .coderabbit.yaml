@@ -9,6 +9,7 @@ reviews:
   collapse_walkthrough: false
   path_filters:
     - "backend/**"
+    - "frontend/**"
     - "README.md"
     - ".coderabbit.yaml"
   path_instructions:
