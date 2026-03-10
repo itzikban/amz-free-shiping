@@ -92,6 +92,14 @@ def main():
     else:
         log("No new commits on open PRs; no trigger needed")
 
+    # Operator reminder for assistant workflow
+    reminder = (
+        "REMINDER: After resolving CodeRabbit comments, summarize resolved/remaining "
+        "items to the user and explicitly ask whether to merge the PR."
+    )
+    log(reminder)
+    print(reminder)
+
     return 0
 
 
