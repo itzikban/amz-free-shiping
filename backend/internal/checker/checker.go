@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ type Result struct {
 	URL                 string    `json:"url"`
 	Country             string    `json:"country"`
 	CheckedAt           time.Time `json:"checked_at"`
+	PriceUSD            float64   `json:"price_usd,omitempty"`
 	FreeShipping        bool      `json:"free_shipping"`
 	FreeShippingCountry bool      `json:"free_shipping_country"`
 	Signal              string    `json:"signal"`
@@ -89,6 +91,7 @@ func AnalyzeHTML(url, country, html string) Result {
 	}
 
 	res := Result{URL: url, Country: country, CheckedAt: time.Now().UTC()}
+	res.PriceUSD = extractUSDPrice(html)
 
 	captchaSignals := []string{"opfcaptcha", "validatecaptcha", "automated access to amazon data", "enter the characters you see below"}
 	for _, c := range captchaSignals {
@@ -150,4 +153,18 @@ func AnalyzeHTML(url, country, html string) Result {
 		res.Signal = "no_free_shipping_signal"
 	}
 	return res
+}
+
+func extractUSDPrice(html string) float64 {
+	re := regexp.MustCompile(`\$\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	m := re.FindStringSubmatch(html)
+	if len(m) < 2 {
+		return 0
+	}
+	n := strings.ReplaceAll(m[1], ",", "")
+	v, err := strconv.ParseFloat(n, 64)
+	if err != nil {
+		return 0
+	}
+	return v
 }

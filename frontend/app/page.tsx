@@ -22,8 +22,10 @@ type Monitor = {
   last_status?: boolean;
   last_signal?: string;
   last_method?: string;
+  last_price_usd?: number;
   history: Array<{
     at: string;
+    price_usd?: number;
     free_shipping: boolean;
     free_shipping_country: boolean;
     signal: string;
@@ -235,6 +237,7 @@ export default function HomePage() {
               )}
               <ul>
                 <li><strong>Country:</strong> {result.country}</li>
+                <li><strong>Price (USD):</strong> {result.price_usd ? `$${result.price_usd.toFixed(2)}` : "-"}</li>
                 <li><strong>free_shipping (generic):</strong> {String(result.free_shipping)}</li>
                 <li><strong>free_shipping_country (strict):</strong> {String(result.free_shipping_country)}</li>
                 <li><strong>Signal:</strong> {result.signal}</li>
@@ -265,15 +268,29 @@ export default function HomePage() {
                 <small>{m.url}</small>
                 <br />
                 <small>
-                  last checked: {m.last_checked_at ? new Date(m.last_checked_at).toLocaleTimeString() : "-"} · status: {String(m.last_status)}
+                  last checked: {m.last_checked_at ? new Date(m.last_checked_at).toLocaleTimeString() : "-"} · status: {String(m.last_status)} · price: {m.last_price_usd ? `$${m.last_price_usd.toFixed(2)}` : "-"}
                 </small>
                 {m.last_signal && <small> · signal: {m.last_signal}</small>}
               </div>
-              {m.running && (
-                <button className="secondary" onClick={() => stopMonitor(m.id)}>
-                  Stop
-                </button>
-              )}
+              <div>
+                {m.running && (
+                  <button className="secondary" onClick={() => stopMonitor(m.id)}>
+                    Stop
+                  </button>
+                )}
+                {m.history?.length > 0 && (
+                  <details>
+                    <summary>History</summary>
+                    <ul>
+                      {m.history.slice(0, 5).map((h, idx) => (
+                        <li key={idx}>
+                          {new Date(h.at).toLocaleTimeString()} · price {h.price_usd ? `$${h.price_usd.toFixed(2)}` : "-"} · strict {String(h.free_shipping_country)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
             </li>
           ))}
         </ul>

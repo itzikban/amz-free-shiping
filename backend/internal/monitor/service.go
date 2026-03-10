@@ -18,6 +18,7 @@ type Notification struct {
 
 type HistoryItem struct {
 	At                  time.Time `json:"at"`
+	PriceUSD            float64   `json:"price_usd,omitempty"`
 	FreeShipping        bool      `json:"free_shipping"`
 	FreeShippingCountry bool      `json:"free_shipping_country"`
 	Signal              string    `json:"signal"`
@@ -37,6 +38,7 @@ type Monitor struct {
 	LastStatus      *bool         `json:"last_status,omitempty"`
 	LastSignal      string        `json:"last_signal,omitempty"`
 	LastMethod      string        `json:"last_method,omitempty"`
+	LastPriceUSD    float64       `json:"last_price_usd,omitempty"`
 	History         []HistoryItem `json:"history"`
 }
 
@@ -125,8 +127,9 @@ func (s *Service) loop(ctx context.Context, id string) {
 			m.LastStatus = &status
 			m.LastSignal = res.Signal
 			m.LastMethod = res.Method
+			m.LastPriceUSD = res.PriceUSD
 			m.RunsDone++
-			m.History = append([]HistoryItem{{At: at, FreeShipping: res.FreeShipping, FreeShippingCountry: res.FreeShippingCountry, Signal: res.Signal, Method: res.Method}}, m.History...)
+			m.History = append([]HistoryItem{{At: at, PriceUSD: res.PriceUSD, FreeShipping: res.FreeShipping, FreeShippingCountry: res.FreeShippingCountry, Signal: res.Signal, Method: res.Method}}, m.History...)
 			if len(m.History) > 20 {
 				m.History = m.History[:20]
 			}
