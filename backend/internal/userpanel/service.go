@@ -98,6 +98,9 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 		Method:             res.Method,
 	}
 	s.items = append([]TrackedItem{item}, s.items...)
+	if len(s.items) > 100 {
+		s.items = s.items[:100]
+	}
 
 	s.seq++
 	alert := Alert{ID: makeID("alert", s.seq), UserID: s.user.ID, CreatedAt: now}

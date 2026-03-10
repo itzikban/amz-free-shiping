@@ -134,7 +134,7 @@ func NewRouter() http.Handler {
 			}
 			item, err := usvc.AddTrackedItem(r.Context(), req)
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 				return
 			}
 			writeJSON(w, http.StatusOK, item)
