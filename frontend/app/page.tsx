@@ -34,6 +34,18 @@ type Monitor = {
 };
 
 type Notification = { monitor_id: string; at: string; message: string };
+type Me = { id: string; name: string };
+type UserTrackedItem = {
+  id: string;
+  url: string;
+  country: string;
+  zip?: string;
+  last_checked_at: string;
+  last_price_usd?: number;
+  free_shipping_country: boolean;
+  signal: string;
+};
+type UserAlert = { id: string; message: string; created_at: string };
 
 const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
 
@@ -47,6 +59,9 @@ export default function HomePage() {
   const [health, setHealth] = useState<"checking" | "up" | "down">("checking");
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [me, setMe] = useState<Me | null>(null);
+  const [userItems, setUserItems] = useState<UserTrackedItem[]>([]);
+  const [userAlerts, setUserAlerts] = useState<UserAlert[]>([]);
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -75,6 +90,50 @@ export default function HomePage() {
       setHealth("down");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshUserPanel() {
+    const [meRes, itemsRes, alertsRes] = await Promise.allSettled([
+      fetch('/api/v1/me'),
+      fetch('/api/v1/me/tracked-items'),
+      fetch('/api/v1/me/alerts'),
+    ]);
+
+    if (meRes.status === 'fulfilled' && meRes.value.ok) {
+      setMe(await meRes.value.json());
+    }
+    if (itemsRes.status === 'fulfilled' && itemsRes.value.ok) {
+      const b = await itemsRes.value.json();
+      setUserItems(b.items || []);
+    }
+    if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
+      const b = await alertsRes.value.json();
+      setUserAlerts(b.alerts || []);
+    }
+  }
+
+  async function addToUserTracking() {
+    if (!canSubmit) return;
+    try {
+      const res = await fetch('/api/v1/me/tracked-items', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          url: form.url,
+          country: form.country,
+          zip: form.country === 'US' ? form.zip.trim() : '',
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        setError(body?.error || 'Failed to add tracked item');
+        return;
+      }
+      setError(null);
+      await refreshUserPanel();
+    } catch {
+      setError('Network error while adding tracked item');
     }
   }
 
@@ -201,6 +260,7 @@ export default function HomePage() {
           setHealth("down");
         });
       refreshMonitorData();
+      refreshUserPanel();
     };
 
     run();
@@ -279,9 +339,14 @@ export default function HomePage() {
               <input type="number" min={1} value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value || 1))} />
             </label>
           </div>
-          <button type="button" className="secondary" onClick={startMonitor} disabled={!canSubmit}>
-            Start monitor (cron test)
-          </button>
+          <div className="row">
+            <button type="button" className="secondary" onClick={startMonitor} disabled={!canSubmit}>
+              Start monitor (cron test)
+            </button>
+            <button type="button" className="secondary" onClick={addToUserTracking} disabled={!canSubmit}>
+              Add product to test-user panel
+            </button>
+          </div>
         </form>
       </section>
 
@@ -314,6 +379,35 @@ export default function HomePage() {
           )}
         </section>
       )}
+
+      <section className="card">
+        <h3>User panel (local test user)</h3>
+        <p className="mutedText">Current user: <strong>{me?.name || 'loading...'}</strong></p>
+        <div className="row split">
+          <div>
+            <h4>Tracked products</h4>
+            <ul>
+              {userItems.length === 0 && <li>No tracked products yet.</li>}
+              {userItems.slice(0, 8).map((it) => (
+                <li key={it.id}>
+                  {it.country} · {it.free_shipping_country ? '✅' : '❌'} · {it.last_price_usd ? `$${it.last_price_usd.toFixed(2)}` : '-'}
+                  <br />
+                  <small>{it.url}</small>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4>Alerts</h4>
+            <ul>
+              {userAlerts.length === 0 && <li>No user alerts yet.</li>}
+              {userAlerts.slice(0, 8).map((a) => (
+                <li key={a.id}>🔔 {new Date(a.created_at).toLocaleTimeString()} · {a.message}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       <section className="card">
         <div className="row actionsRow">
