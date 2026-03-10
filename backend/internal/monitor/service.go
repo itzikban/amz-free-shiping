@@ -153,6 +153,10 @@ func (s *Service) loop(ctx context.Context, id string) {
 			at := time.Now().UTC()
 
 			s.mu.Lock()
+			if ctx.Err() != nil {
+				s.mu.Unlock()
+				return
+			}
 			prev := m.LastStatus
 			m.LastCheckedAt = &at
 			m.LastStatus = &status

@@ -28,6 +28,17 @@ type Service struct {
 	Client *http.Client
 }
 
+var (
+	reBuyNewText          = regexp.MustCompile(`(?is)buy\s*new[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	reOneTimePurchaseText = regexp.MustCompile(`(?is)one[- ]time\s*purchase[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	rePriceToPayText      = regexp.MustCompile(`(?is)price\s*to\s*pay[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	rePriceToPayJSON      = regexp.MustCompile(`(?is)"pricetopay"\s*:\s*\{[^\}]*"priceamount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`)
+	reOurPriceJSON        = regexp.MustCompile(`(?is)"ourprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`)
+	reDealPriceJSON       = regexp.MustCompile(`(?is)"dealprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`)
+	reAOffscreen          = regexp.MustCompile(`(?is)a-offscreen">\s*\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*<`)
+	reAnyUSD              = regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+)
+
 func New() *Service {
 	return &Service{Client: &http.Client{Timeout: 20 * time.Second}}
 }
@@ -159,12 +170,7 @@ func extractUSDPrice(html string) float64 {
 	lower := strings.ToLower(html)
 
 	// 0) Explicit textual anchors first
-	for _, pat := range []string{
-		`(?is)buy\s*new[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`,
-		`(?is)one[- ]time\s*purchase[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`,
-		`(?is)price\s*to\s*pay[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`,
-	} {
-		re := regexp.MustCompile(pat)
+	for _, re := range []*regexp.Regexp{reBuyNewText, reOneTimePurchaseText, rePriceToPayText} {
 		m := re.FindStringSubmatch(lower)
 		if len(m) >= 2 {
 			n := strings.ReplaceAll(m[1], ",", "")
@@ -175,12 +181,7 @@ func extractUSDPrice(html string) float64 {
 	}
 
 	// 1) Strong structured signals first (Amazon JSON blobs)
-	for _, pat := range []string{
-		`"pricetopay"\s*:\s*\{[^\}]*"priceamount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`,
-		`"ourprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`,
-		`"dealprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`,
-	} {
-		re := regexp.MustCompile(`(?is)` + pat)
+	for _, re := range []*regexp.Regexp{rePriceToPayJSON, reOurPriceJSON, reDealPriceJSON} {
 		m := re.FindStringSubmatch(lower)
 		if len(m) >= 2 {
 			if v, err := strconv.ParseFloat(m[1], 64); err == nil && v > 0 {
@@ -190,8 +191,7 @@ func extractUSDPrice(html string) float64 {
 	}
 
 	// 2) Common buy-box markup (<span class="a-offscreen">$xx.xx</span>) near buy new/price
-	off := regexp.MustCompile(`(?is)a-offscreen">\s*\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*<`)
-	offs := off.FindAllStringSubmatchIndex(lower, -1)
+	offs := reAOffscreen.FindAllStringSubmatchIndex(lower, -1)
 	bestOff := 0.0
 	bestScore := -999
 	for _, m := range offs {
@@ -230,8 +230,7 @@ func extractUSDPrice(html string) float64 {
 	}
 
 	// 3) Fallback heuristic scan
-	re := regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
-	idxs := re.FindAllStringSubmatchIndex(html, -1)
+	idxs := reAnyUSD.FindAllStringSubmatchIndex(lower, -1)
 	if len(idxs) == 0 {
 		return 0
 	}
@@ -240,7 +239,7 @@ func extractUSDPrice(html string) float64 {
 	for _, m := range idxs {
 		start, end := m[0], m[1]
 		g1s, g1e := m[2], m[3]
-		n := strings.ReplaceAll(html[g1s:g1e], ",", "")
+		n := strings.ReplaceAll(lower[g1s:g1e], ",", "")
 		v, err := strconv.ParseFloat(n, 64)
 		if err != nil {
 			continue

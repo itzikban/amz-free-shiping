@@ -109,27 +109,45 @@ export default function HomePage() {
       interval_seconds: intervalSec,
       max_runs: maxRuns,
     };
-    const res = await fetch("/api/monitor/start", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      setError(null);
-      await refreshMonitorData();
-      return;
-    }
     try {
-      const body = await res.json();
-      setError(body?.error || "Failed to start monitor");
+      const res = await fetch("/api/monitor/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setError(null);
+        await refreshMonitorData();
+        return;
+      }
+      try {
+        const body = await res.json();
+        setError(body?.error || "Failed to start monitor");
+      } catch {
+        setError("Failed to start monitor");
+      }
     } catch {
-      setError("Failed to start monitor");
+      setError("Network error while starting monitor");
     }
   }
 
   async function stopMonitor(id: string) {
-    await fetch(`/api/monitor/stop?id=${encodeURIComponent(id)}`, { method: "POST" });
-    await refreshMonitorData();
+    try {
+      const res = await fetch(`/api/monitor/stop?id=${encodeURIComponent(id)}`, { method: "POST" });
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          setError(body?.error || "Failed to stop monitor");
+        } catch {
+          setError("Failed to stop monitor");
+        }
+        return;
+      }
+      setError(null);
+      await refreshMonitorData();
+    } catch {
+      setError("Network error while stopping monitor");
+    }
   }
 
   async function clearMonitors() {
@@ -284,7 +302,7 @@ export default function HomePage() {
                 <small>{m.url}</small>
                 <br />
                 <small>
-                  last checked: {m.last_checked_at ? new Date(m.last_checked_at).toLocaleTimeString() : "-"} · status: {String(m.last_status)} · price: {m.last_price_usd ? `$${m.last_price_usd.toFixed(2)}` : "-"}
+                  last checked: {m.last_checked_at ? new Date(m.last_checked_at).toLocaleTimeString() : "-"} · status: {m.last_status == null ? "-" : m.last_status ? "✅" : "❌"} · price: {m.last_price_usd ? `$${m.last_price_usd.toFixed(2)}` : "-"}
                 </small>
                 {m.last_signal && <small> · signal: {m.last_signal}</small>}
               </div>
