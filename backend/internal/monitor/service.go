@@ -130,15 +130,25 @@ func (s *Service) loop(ctx context.Context, id string) {
 			if len(m.History) > 20 {
 				m.History = m.History[:20]
 			}
-			if prev != nil && *prev != status {
+			if prev == nil {
+				s.notifications = append([]Notification{{MonitorID: id, At: at, Message: fmt.Sprintf("Initial status: %v", status)}}, s.notifications...)
+			} else if *prev != status {
 				s.notifications = append([]Notification{{MonitorID: id, At: at, Message: fmt.Sprintf("Status changed: %v -> %v", *prev, status)}}, s.notifications...)
+			}
+			if len(s.notifications) > 100 {
+				s.notifications = s.notifications[:100]
+			}
+			stopNow := m.RunsDone >= m.MaxRuns
+			maxRuns := m.MaxRuns
+			runsDone := m.RunsDone
+			s.mu.Unlock()
+			if stopNow {
+				s.mu.Lock()
+				s.notifications = append([]Notification{{MonitorID: id, At: time.Now().UTC(), Message: fmt.Sprintf("Monitor completed: %d/%d runs", runsDone, maxRuns)}}, s.notifications...)
 				if len(s.notifications) > 100 {
 					s.notifications = s.notifications[:100]
 				}
-			}
-			stopNow := m.RunsDone >= m.MaxRuns
-			s.mu.Unlock()
-			if stopNow {
+				s.mu.Unlock()
 				s.Stop(id)
 			}
 		}
