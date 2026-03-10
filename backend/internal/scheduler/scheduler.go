@@ -13,8 +13,8 @@ type DueItem struct {
 }
 
 type DueItemSource interface {
-	ListDueItems(ctx context.Context, now time.Time, limit int) ([]DueItem, error)
-	MarkNextCheck(ctx context.Context, trackedItemID int64, next time.Time) error
+	ClaimDueItems(ctx context.Context, now time.Time, next time.Time, limit int) ([]DueItem, error)
+	ReleaseClaim(ctx context.Context, trackedItemID int64, now time.Time) error
 }
 
 type Enqueuer interface {
@@ -36,7 +36,8 @@ func (s *Service) Tick(ctx context.Context, now time.Time) (int, error) {
 		s.DefaultInterval = 6 * time.Hour
 	}
 
-	items, err := s.Source.ListDueItems(ctx, now, s.BatchSize)
+	next := now.Add(s.DefaultInterval)
+	items, err := s.Source.ClaimDueItems(ctx, now, next, s.BatchSize)
 	if err != nil {
 		return 0, err
 	}
@@ -44,10 +45,7 @@ func (s *Service) Tick(ctx context.Context, now time.Time) (int, error) {
 	enqueued := 0
 	for _, item := range items {
 		if err := s.Queue.EnqueueCheck(ctx, item); err != nil {
-			continue
-		}
-		next := now.Add(s.DefaultInterval)
-		if err := s.Source.MarkNextCheck(ctx, item.TrackedItemID, next); err != nil {
+			_ = s.Source.ReleaseClaim(ctx, item.TrackedItemID, now)
 			continue
 		}
 		enqueued++

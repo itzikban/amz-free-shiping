@@ -68,7 +68,8 @@ func (q *RedisQueue) Pop(ctx context.Context, timeout time.Duration) (*Job, erro
 
 func (q *RedisQueue) RetryOrDeadLetter(ctx context.Context, job *Job, reason string) error {
 	job.Attempts++
-	if job.Attempts >= job.MaxRetries {
+	job.LastError = reason
+	if job.Attempts > job.MaxRetries {
 		jb, _ := json.Marshal(job)
 		return q.client.LPush(ctx, QueueDeadLetter, jb).Err()
 	}
