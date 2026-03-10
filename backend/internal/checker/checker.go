@@ -157,18 +157,86 @@ func AnalyzeHTML(url, country, html string) Result {
 
 func extractUSDPrice(html string) float64 {
 	lower := strings.ToLower(html)
+
+	// 0) Explicit textual anchors first
+	for _, pat := range []string{
+		`(?is)buy\s*new[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`,
+		`(?is)one[- ]time\s*purchase[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`,
+		`(?is)price\s*to\s*pay[^$]{0,40}\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`,
+	} {
+		re := regexp.MustCompile(pat)
+		m := re.FindStringSubmatch(lower)
+		if len(m) >= 2 {
+			n := strings.ReplaceAll(m[1], ",", "")
+			if v, err := strconv.ParseFloat(n, 64); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	// 1) Strong structured signals first (Amazon JSON blobs)
+	for _, pat := range []string{
+		`"pricetopay"\s*:\s*\{[^\}]*"priceamount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`,
+		`"ourprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`,
+		`"dealprice"\s*:\s*\{[^\}]*"amount"\s*:\s*([0-9]+(?:\.[0-9]{1,2})?)`,
+	} {
+		re := regexp.MustCompile(`(?is)` + pat)
+		m := re.FindStringSubmatch(lower)
+		if len(m) >= 2 {
+			if v, err := strconv.ParseFloat(m[1], 64); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	// 2) Common buy-box markup (<span class="a-offscreen">$xx.xx</span>) near buy new/price
+	off := regexp.MustCompile(`(?is)a-offscreen">\s*\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*<`)
+	offs := off.FindAllStringSubmatchIndex(html, -1)
+	bestOff := 0.0
+	bestScore := -999
+	for _, m := range offs {
+		start, end := m[0], m[1]
+		g1s, g1e := m[2], m[3]
+		n := strings.ReplaceAll(html[g1s:g1e], ",", "")
+		v, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			continue
+		}
+		left := start - 180
+		if left < 0 {
+			left = 0
+		}
+		right := end + 180
+		if right > len(lower) {
+			right = len(lower)
+		}
+		ctx := lower[left:right]
+		s := 0
+		if strings.Contains(ctx, "buy new") || strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "priceblock") {
+			s += 8
+		}
+		if strings.Contains(ctx, "a-price") {
+			s += 3
+		}
+		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ") || strings.Contains(ctx, "shipping") || strings.Contains(ctx, "over $") {
+			s -= 6
+		}
+		if s > bestScore || (s == bestScore && (bestOff == 0 || v < bestOff)) {
+			bestScore, bestOff = s, v
+		}
+	}
+	if bestOff > 0 && bestScore >= 2 {
+		return bestOff
+	}
+
+	// 3) Fallback heuristic scan
 	re := regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
 	idxs := re.FindAllStringSubmatchIndex(html, -1)
 	if len(idxs) == 0 {
 		return 0
 	}
-
-	type cand struct {
-		value float64
-		score int
-	}
+	type cand struct{ value float64; score int }
 	cands := make([]cand, 0, len(idxs))
-
 	for _, m := range idxs {
 		start, end := m[0], m[1]
 		g1s, g1e := m[2], m[3]
@@ -177,53 +245,21 @@ func extractUSDPrice(html string) float64 {
 		if err != nil {
 			continue
 		}
-
 		left := start - 120
-		if left < 0 {
-			left = 0
-		}
+		if left < 0 { left = 0 }
 		right := end + 120
-		if right > len(lower) {
-			right = len(lower)
-		}
+		if right > len(lower) { right = len(lower) }
 		ctx := lower[left:right]
-
 		score := 0
-		if strings.Contains(ctx, "buy new") {
-			score += 6
-		}
-		if strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "ourprice") || strings.Contains(ctx, "dealprice") {
-			score += 5
-		}
-		if strings.Contains(ctx, "a-price") || strings.Contains(ctx, "priceblock") {
-			score += 3
-		}
-		if strings.Contains(ctx, "one-time purchase") {
-			score += 3
-		}
-
-		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ounce") || strings.Contains(ctx, "coupon") || strings.Contains(ctx, "save") || strings.Contains(ctx, "shipping") {
-			score -= 5
-		}
-		if strings.Contains(ctx, "list price") || strings.Contains(ctx, "was ") {
-			score -= 2
-		}
-
-		if v < 1 {
-			score -= 3
-		}
-		cands = append(cands, cand{value: v, score: score})
+		if strings.Contains(ctx, "buy new") || strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "ourprice") || strings.Contains(ctx, "dealprice") { score += 6 }
+		if strings.Contains(ctx, "one-time purchase") { score += 3 }
+		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ounce") || strings.Contains(ctx, "shipping") || strings.Contains(ctx, "coupon") || strings.Contains(ctx, "over $") { score -= 6 }
+		cands = append(cands, cand{value:v, score:score})
 	}
-
-	if len(cands) == 0 {
-		return 0
-	}
-
+	if len(cands) == 0 { return 0 }
 	best := cands[0]
 	for _, c := range cands[1:] {
-		if c.score > best.score || (c.score == best.score && c.value > best.value) {
-			best = c
-		}
+		if c.score > best.score || (c.score == best.score && c.value < best.value) { best = c }
 	}
 	return best.value
 }

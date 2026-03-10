@@ -53,3 +53,11 @@ func TestExtractUSDPrice_OneTimePurchase(t *testing.T) {
 		t.Fatalf("expected 16.19, got %.2f", p)
 	}
 }
+
+func TestExtractUSDPrice_PrefersProductPriceOverShippingThreshold(t *testing.T) {
+	html := `<div>One-time purchase: $5.99</div><div>FREE delivery Monday on orders shipped by Amazon over $35</div>`
+	p := extractUSDPrice(html)
+	if p != 5.99 {
+		t.Fatalf("expected 5.99, got %.2f", p)
+	}
+}
