@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CheckResponse } from "@/lib/types";
 
 type FormState = {
@@ -16,6 +16,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
+  const [health, setHealth] = useState<"checking" | "up" | "down">("checking");
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -45,7 +46,14 @@ export default function HomePage() {
     }
   }
 
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => (r.ok ? setHealth("up") : setHealth("down")))
+      .catch(() => setHealth("down"));
+  }, []);
+
   const isFree = result?.free_shipping_country;
+  const isGenericFree = result?.free_shipping;
 
   return (
     <main className="container">
@@ -55,6 +63,9 @@ export default function HomePage() {
           Country-aware shipping checker powered by your backend. Enter an Amazon URL, destination,
           and get a strict free-shipping verdict.
         </p>
+        <div className={`health ${health}`}>
+          Backend: {health === "checking" ? "Checking..." : health === "up" ? "Online" : "Offline"}
+        </div>
       </section>
 
       <section className="card">
@@ -111,9 +122,18 @@ export default function HomePage() {
               <div className={`badge ${isFree ? "ok" : "no"}`}>
                 {isFree ? "✅ Free shipping for destination" : "❌ Not free for destination"}
               </div>
+              {!isFree && isGenericFree && (
+                <p className="hint">Generic free-shipping text was found, but not confirmed for selected destination.</p>
+              )}
               <ul>
                 <li>
                   <strong>Country:</strong> {result.country}
+                </li>
+                <li>
+                  <strong>free_shipping (generic):</strong> {String(result.free_shipping)}
+                </li>
+                <li>
+                  <strong>free_shipping_country (strict):</strong> {String(result.free_shipping_country)}
                 </li>
                 <li>
                   <strong>Signal:</strong> {result.signal}
@@ -125,6 +145,10 @@ export default function HomePage() {
                   <strong>Checked:</strong> {new Date(result.checked_at).toLocaleString()}
                 </li>
               </ul>
+              <details>
+                <summary>Raw backend response</summary>
+                <pre>{JSON.stringify(result, null, 2)}</pre>
+              </details>
             </>
           )}
         </section>
