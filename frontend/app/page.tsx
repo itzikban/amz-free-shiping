@@ -39,17 +39,35 @@ export default function HomePage() {
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");
       setResult(body);
+      setHealth("up");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      setHealth("down");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => (r.ok ? setHealth("up") : setHealth("down")))
-      .catch(() => setHealth("down"));
+    let active = true;
+    const run = () => {
+      fetch("/api/health")
+        .then((r) => {
+          if (!active) return;
+          setHealth(r.ok ? "up" : "down");
+        })
+        .catch(() => {
+          if (!active) return;
+          setHealth("down");
+        });
+    };
+
+    run();
+    const id = setInterval(run, 8000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, []);
 
   const isFree = result?.free_shipping_country;
