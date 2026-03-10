@@ -1,5 +1,7 @@
 # amz-free-shiping (Monorepo)
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/itzikban/amz-free-shiping?utm_source=oss&utm_medium=github&utm_campaign=itzikban%2Famz-free-shiping&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 This repository is structured as a **monorepo** for multiple services.
 
 ## Current layout
