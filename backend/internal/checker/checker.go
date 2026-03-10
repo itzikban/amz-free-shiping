@@ -156,15 +156,74 @@ func AnalyzeHTML(url, country, html string) Result {
 }
 
 func extractUSDPrice(html string) float64 {
-	re := regexp.MustCompile(`\$\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
-	m := re.FindStringSubmatch(html)
-	if len(m) < 2 {
+	lower := strings.ToLower(html)
+	re := regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
+	idxs := re.FindAllStringSubmatchIndex(html, -1)
+	if len(idxs) == 0 {
 		return 0
 	}
-	n := strings.ReplaceAll(m[1], ",", "")
-	v, err := strconv.ParseFloat(n, 64)
-	if err != nil {
+
+	type cand struct {
+		value float64
+		score int
+	}
+	cands := make([]cand, 0, len(idxs))
+
+	for _, m := range idxs {
+		start, end := m[0], m[1]
+		g1s, g1e := m[2], m[3]
+		n := strings.ReplaceAll(html[g1s:g1e], ",", "")
+		v, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			continue
+		}
+
+		left := start - 120
+		if left < 0 {
+			left = 0
+		}
+		right := end + 120
+		if right > len(lower) {
+			right = len(lower)
+		}
+		ctx := lower[left:right]
+
+		score := 0
+		if strings.Contains(ctx, "buy new") {
+			score += 6
+		}
+		if strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "ourprice") || strings.Contains(ctx, "dealprice") {
+			score += 5
+		}
+		if strings.Contains(ctx, "a-price") || strings.Contains(ctx, "priceblock") {
+			score += 3
+		}
+		if strings.Contains(ctx, "one-time purchase") {
+			score += 3
+		}
+
+		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ounce") || strings.Contains(ctx, "coupon") || strings.Contains(ctx, "save") || strings.Contains(ctx, "shipping") {
+			score -= 5
+		}
+		if strings.Contains(ctx, "list price") || strings.Contains(ctx, "was ") {
+			score -= 2
+		}
+
+		if v < 1 {
+			score -= 3
+		}
+		cands = append(cands, cand{value: v, score: score})
+	}
+
+	if len(cands) == 0 {
 		return 0
 	}
-	return v
+
+	best := cands[0]
+	for _, c := range cands[1:] {
+		if c.score > best.score || (c.score == best.score && c.value > best.value) {
+			best = c
+		}
+	}
+	return best.value
 }

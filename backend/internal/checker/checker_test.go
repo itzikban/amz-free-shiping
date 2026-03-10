@@ -37,3 +37,19 @@ func TestAnalyzeHTML_NotEligible(t *testing.T) {
 		t.Fatalf("expected FreeShipping=false, got true, signal=%s", res.Signal)
 	}
 }
+
+func TestExtractUSDPrice_PrefersBuyPriceOverPerUnit(t *testing.T) {
+	html := `<div>($10.00 / count)</div><div>Buy new: $39.99</div>`
+	p := extractUSDPrice(html)
+	if p != 39.99 {
+		t.Fatalf("expected 39.99, got %.2f", p)
+	}
+}
+
+func TestExtractUSDPrice_OneTimePurchase(t *testing.T) {
+	html := `<div>One-time purchase: $16.19</div><div>Save $2.00</div>`
+	p := extractUSDPrice(html)
+	if p != 16.19 {
+		t.Fatalf("expected 16.19, got %.2f", p)
+	}
+}
