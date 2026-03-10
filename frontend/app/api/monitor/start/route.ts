@@ -3,7 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
 
 export async function POST(req: NextRequest) {
-  const payload = await req.json();
+  let payload: unknown;
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
   try {
     const res = await fetch(new URL("/monitor/start", BACKEND_BASE_URL), {
       method: "POST",

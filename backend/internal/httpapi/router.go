@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"free-ship-checker-go/internal/checker"
 	"free-ship-checker-go/internal/monitor"
@@ -14,10 +15,18 @@ func NewRouter() http.Handler {
 	msvc := monitor.New(svc)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
 	mux.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
 		url := r.URL.Query().Get("url")
 		country := r.URL.Query().Get("country")
 		zip := r.URL.Query().Get("zip")
@@ -66,6 +75,10 @@ func NewRouter() http.Handler {
 	})
 
 	mux.HandleFunc("/monitor/list", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"monitors": msvc.List()})
 	})
 
@@ -75,12 +88,16 @@ func NewRouter() http.Handler {
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 			return
 		}
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet, http.MethodDelete)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"notifications": msvc.Notifications()})
 	})
 
 	mux.HandleFunc("/monitor/clear", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
-			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			methodNotAllowed(w, http.MethodDelete)
 			return
 		}
 		msvc.ClearMonitors()
@@ -94,4 +111,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func methodNotAllowed(w http.ResponseWriter, allowed ...string) {
+	if len(allowed) > 0 {
+		w.Header().Set("Allow", strings.Join(allowed, ", "))
+	}
+	writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 }

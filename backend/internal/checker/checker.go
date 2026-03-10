@@ -191,13 +191,13 @@ func extractUSDPrice(html string) float64 {
 
 	// 2) Common buy-box markup (<span class="a-offscreen">$xx.xx</span>) near buy new/price
 	off := regexp.MustCompile(`(?is)a-offscreen">\s*\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*<`)
-	offs := off.FindAllStringSubmatchIndex(html, -1)
+	offs := off.FindAllStringSubmatchIndex(lower, -1)
 	bestOff := 0.0
 	bestScore := -999
 	for _, m := range offs {
 		start, end := m[0], m[1]
 		g1s, g1e := m[2], m[3]
-		n := strings.ReplaceAll(html[g1s:g1e], ",", "")
+		n := strings.ReplaceAll(lower[g1s:g1e], ",", "")
 		v, err := strconv.ParseFloat(n, 64)
 		if err != nil {
 			continue

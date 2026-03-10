@@ -79,18 +79,24 @@ export default function HomePage() {
   }
 
   async function refreshMonitorData() {
-    try {
-      const [mRes, nRes] = await Promise.all([fetch("/api/monitor/list"), fetch("/api/monitor/notifications")]);
-      if (mRes.ok) {
-        const mb = await mRes.json();
+    const [mRes, nRes] = await Promise.allSettled([fetch("/api/monitor/list"), fetch("/api/monitor/notifications")]);
+
+    if (mRes.status === "fulfilled") {
+      if (mRes.value.ok) {
+        const mb = await mRes.value.json();
         setMonitors(mb.monitors || []);
       }
-      if (nRes.ok) {
-        const nb = await nRes.json();
+    } else {
+      console.error("monitor/list failed", mRes.reason);
+    }
+
+    if (nRes.status === "fulfilled") {
+      if (nRes.value.ok) {
+        const nb = await nRes.value.json();
         setNotifications(nb.notifications || []);
       }
-    } catch {
-      // ignore
+    } else {
+      console.error("monitor/notifications failed", nRes.reason);
     }
   }
 
@@ -99,7 +105,7 @@ export default function HomePage() {
     const payload = {
       url: form.url,
       country: form.country,
-      zip: form.country === "US" ? form.zip : "",
+      zip: form.country === "US" ? form.zip.trim() : "",
       interval_seconds: intervalSec,
       max_runs: maxRuns,
     };
@@ -108,7 +114,17 @@ export default function HomePage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (res.ok) await refreshMonitorData();
+    if (res.ok) {
+      setError(null);
+      await refreshMonitorData();
+      return;
+    }
+    try {
+      const body = await res.json();
+      setError(body?.error || "Failed to start monitor");
+    } catch {
+      setError("Failed to start monitor");
+    }
   }
 
   async function stopMonitor(id: string) {

@@ -3,6 +3,8 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +60,12 @@ type Service struct {
 	notifications []Notification
 }
 
+const (
+	minIntervalSeconds = 5
+	maxIntervalSeconds = 3600
+	maxActiveMonitors  = 50
+)
+
 func New(svc *checker.Service) *Service {
 	return &Service{checker: svc, monitors: map[string]*Monitor{}, cancels: map[string]context.CancelFunc{}, notifications: []Notification{}}
 }
@@ -66,20 +74,40 @@ func (s *Service) Start(ctx context.Context, r StartReq) (*Monitor, error) {
 	if r.URL == "" {
 		return nil, fmt.Errorf("missing url")
 	}
+	u, err := url.Parse(r.URL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("invalid url")
+	}
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf("url must use https")
+	}
+	host := strings.ToLower(u.Hostname())
+	allowed := host == "amazon.com" || strings.HasSuffix(host, ".amazon.com")
+	if !allowed {
+		return nil, fmt.Errorf("unsupported host: %s", host)
+	}
+
 	if r.Country == "" {
 		r.Country = "US"
 	}
-	if r.IntervalSeconds <= 0 {
+	if r.IntervalSeconds == 0 {
 		r.IntervalSeconds = 30
+	}
+	if r.IntervalSeconds < minIntervalSeconds || r.IntervalSeconds > maxIntervalSeconds {
+		return nil, fmt.Errorf("interval_seconds out of range (%d-%d)", minIntervalSeconds, maxIntervalSeconds)
 	}
 	if r.MaxRuns <= 0 {
 		r.MaxRuns = 10
 	}
-	id := uuid.NewString()
-	m := &Monitor{ID: id, URL: r.URL, Country: r.Country, ZIP: r.ZIP, IntervalSeconds: r.IntervalSeconds, MaxRuns: r.MaxRuns, RunsDone: 0, Running: true, History: []HistoryItem{}}
 
-	mctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
+	if len(s.monitors) >= maxActiveMonitors {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("too many active monitors")
+	}
+	id := uuid.NewString()
+	m := &Monitor{ID: id, URL: r.URL, Country: r.Country, ZIP: strings.TrimSpace(r.ZIP), IntervalSeconds: r.IntervalSeconds, MaxRuns: r.MaxRuns, RunsDone: 0, Running: true, History: []HistoryItem{}}
+	mctx, cancel := context.WithCancel(context.Background())
 	s.monitors[id] = m
 	s.cancels[id] = cancel
 	s.mu.Unlock()
@@ -117,6 +145,9 @@ func (s *Service) loop(ctx context.Context, id string) {
 			res, err := s.checker.CheckURL(ctx, m.URL, m.Country, m.ZIP)
 			if err != nil {
 				continue
+			}
+			if ctx.Err() != nil {
+				return
 			}
 			status := res.FreeShippingCountry
 			at := time.Now().UTC()
