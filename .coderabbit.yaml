@@ -1,0 +1,22 @@
+language: "en-US"
+early_access: false
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_filters:
+    - "backend/**"
+  path_instructions:
+    - path: "backend/**"
+      instructions: |
+        This repository is a monorepo. Focus review on backend Go service quality:
+        - Correctness of country-specific shipping detection logic
+        - API contract stability for /check endpoint
+        - Security (no secrets in code, env-based config)
+        - Reliability and error handling for scraper integrations
+        - Clear tests and maintainability
+chat:
+  auto_reply: true
