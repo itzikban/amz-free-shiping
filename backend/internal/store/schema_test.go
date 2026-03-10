@@ -20,6 +20,8 @@ func TestInitialSchemaContainsCoreTables(t *testing.T) {
 		"create table if not exists alerts",
 		"create table if not exists outbox",
 		"create table if not exists notification_attempts",
+		"create index if not exists idx_alternatives_tracked_item_id",
+		"create index if not exists idx_outbox_alert_id",
 	}
 
 	for _, m := range mustContain {

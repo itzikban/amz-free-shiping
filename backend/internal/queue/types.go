@@ -11,12 +11,13 @@ const (
 )
 
 type Job struct {
-	ID         string          `json:"id"`
-	Type       string          `json:"type"`
-	Payload    []byte          `json:"payload"`
-	Attempts   int             `json:"attempts"`
-	MaxRetries int             `json:"max_retries"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID         string    `json:"id"`
+	Type       string    `json:"type"`
+	Payload    []byte    `json:"payload"`
+	Attempts   int       `json:"attempts"`
+	MaxRetries int       `json:"max_retries"`
+	LastError  string    `json:"last_error,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type CheckItemPayload struct {

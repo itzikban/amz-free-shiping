@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS alternatives (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_alternatives_tracked_item_id ON alternatives (tracked_item_id);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id BIGSERIAL PRIMARY KEY,
   tracked_item_id BIGINT NOT NULL REFERENCES tracked_items(id) ON DELETE CASCADE,
@@ -70,6 +72,7 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbox_due ON outbox (status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_outbox_alert_id ON outbox (alert_id);
 
 CREATE TABLE IF NOT EXISTS notification_attempts (
   id BIGSERIAL PRIMARY KEY,

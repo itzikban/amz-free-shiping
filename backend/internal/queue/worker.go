@@ -25,20 +25,30 @@ func (w *Worker) Run(ctx context.Context) error {
 		default:
 		}
 
-		_, _ = w.Q.DrainDueRetries(ctx)
+		if _, err := w.Q.DrainDueRetries(ctx); err != nil {
+			log.Printf("drain retries failed: %v", err)
+		}
 		job, err := w.Q.Pop(ctx, 2*time.Second)
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			log.Printf("queue pop failed: %v", err)
 			continue
 		}
 		h, ok := w.Handlers[job.Type]
 		if !ok {
 			log.Printf("unknown job type: %s", job.Type)
-			_ = w.Q.RetryOrDeadLetter(ctx, job, "unknown_job_type")
+			if derr := w.Q.RetryOrDeadLetter(ctx, job, "unknown_job_type"); derr != nil {
+				log.Printf("failed to move unknown job %s to retry/dlq: %v", job.ID, derr)
+			}
 			continue
 		}
 		if err := h(ctx, job); err != nil {
 			log.Printf("job failed %s: %v", job.ID, err)
-			_ = w.Q.RetryOrDeadLetter(ctx, job, err.Error())
+			if derr := w.Q.RetryOrDeadLetter(ctx, job, err.Error()); derr != nil {
+				log.Printf("failed to move failed job %s to retry/dlq: %v", job.ID, derr)
+			}
 		}
 	}
 }
