@@ -24,3 +24,7 @@ go run ./cmd/server
 ```
 
 API runs on `:8085` by default.
+
+## Dev note
+
+This line is added to validate PR automation (CodeRabbit + Linear).
