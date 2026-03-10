@@ -151,13 +151,41 @@ export default function HomePage() {
   }
 
   async function clearMonitors() {
-    await fetch("/api/monitor/clear", { method: "DELETE" });
-    await refreshMonitorData();
+    try {
+      const res = await fetch("/api/monitor/clear", { method: "DELETE" });
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          setError(body?.error || "Failed to clear monitors");
+        } catch {
+          setError("Failed to clear monitors");
+        }
+        return;
+      }
+      setError(null);
+      await refreshMonitorData();
+    } catch {
+      setError("Network error while clearing monitors");
+    }
   }
 
   async function clearNotifications() {
-    await fetch("/api/monitor/notifications", { method: "DELETE" });
-    await refreshMonitorData();
+    try {
+      const res = await fetch("/api/monitor/notifications", { method: "DELETE" });
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          setError(body?.error || "Failed to reset notifications");
+        } catch {
+          setError("Failed to reset notifications");
+        }
+        return;
+      }
+      setError(null);
+      await refreshMonitorData();
+    } catch {
+      setError("Network error while resetting notifications");
+    }
   }
 
   useEffect(() => {

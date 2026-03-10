@@ -211,6 +211,8 @@ func (s *Service) List() []*Monitor {
 	out := make([]*Monitor, 0, len(s.monitors))
 	for _, m := range s.monitors {
 		cp := *m
+		cp.History = make([]HistoryItem, len(m.History))
+		copy(cp.History, m.History)
 		out = append(out, &cp)
 	}
 	return out
