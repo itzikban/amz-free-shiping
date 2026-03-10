@@ -28,6 +28,22 @@ go run ./cmd/server
 
 API runs on `:8085` by default.
 
-## Dev note
+## Implemented features
 
-This line is added to validate PR automation (CodeRabbit + Linear).
+### Backend
+- Country-aware `/check` endpoint (`US` with ZIP, `IL` strict destination logic)
+- Decodo integration as primary scraper source
+- Captcha/blocked-page detection signaling
+- Initial PostgreSQL schema migration (`backend/migrations/001_init.sql`)
+- Redis queue runtime with retry + dead-letter flow
+- Scheduler service for enqueueing due checks
+
+### Frontend
+- Responsive Next.js app in `frontend/`
+- URL + country + ZIP check form
+- Backend health indicator (live polling)
+- Strict result display (`free_shipping` vs `free_shipping_country`)
+- Raw backend response viewer for debugging
+
+## Notes
+- Feature implementation docs are tracked under `docs/features/`.
