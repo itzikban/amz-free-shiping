@@ -18,3 +18,14 @@ func TestSnapshot(t *testing.T) {
 		t.Fatalf("bad user aggregation: %+v", s)
 	}
 }
+
+func TestSnapshotNilProviders(t *testing.T) {
+	svc := &Service{}
+	s := svc.Snapshot()
+	if s.MonitorsTotal != 0 || s.MonitorsRunning != 0 || s.Notifications != 0 {
+		t.Fatalf("expected zero monitor counts with nil provider: %+v", s)
+	}
+	if s.UserTrackedItems != 0 || s.UserAlerts != 0 {
+		t.Fatalf("expected zero user counts with nil provider: %+v", s)
+	}
+}

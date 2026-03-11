@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -214,7 +215,7 @@ func requireAdmin(r *http.Request, w http.ResponseWriter) bool {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing admin credentials"})
 		return false
 	}
-	if provided != adminToken {
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(adminToken)) != 1 {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
 		return false
 	}

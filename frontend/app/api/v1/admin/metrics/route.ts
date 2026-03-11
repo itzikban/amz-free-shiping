@@ -35,10 +35,17 @@ export async function GET(req: Request) {
     }
 
     const raw = await res.text();
+    if (raw) {
+      console.error('admin metrics route: upstream returned non-JSON response', {
+        status: res.status,
+        contentType: contentType || 'unknown',
+        body: '<REDACTED_BODY>',
+      });
+    }
     return NextResponse.json(
       {
         error: 'backend_unexpected_response',
-        detail: { contentType: contentType || 'unknown', body: raw || 'empty response body' },
+        detail: { contentType: contentType || 'unknown', body: raw ? '<redacted upstream response>' : 'empty response body' },
       },
       { status: 502 }
     );
