@@ -191,17 +191,8 @@ def main():
             last_requested_sha = prev.get("last_requested_review_sha")
             req_at = parse_iso(prev.get("last_requested_review_at"))
 
-            if sha_changed and last_requested_sha != sha:
-                try:
-                    run(["gh", "pr", "comment", num, "--body", "@coderabbitai review\n\nAuto-request on new SHA."])
-                    prev["last_requested_review_sha"] = sha
-                    prev["last_requested_review_at"] = now.isoformat()
-                    prev["retrigger_count"] = 0
-                    log(f"PR #{num} requested CodeRabbit review on new SHA {sha[:12]}")
-                    any_event = True
-                except Exception as e:
-                    log(f"ERROR requesting review PR #{num}: {e}")
-
+            # Do NOT auto-request review just because SHA changed.
+            # Review requests should only be triggered after an actual fix commit cycle.
             no_fresh_activity_since_request = False
             if req_at:
                 latest_activity_ts = max(
