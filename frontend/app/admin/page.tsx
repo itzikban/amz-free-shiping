@@ -116,12 +116,12 @@ export default function AdminPage() {
         <h3>Metrics snapshot</h3>
         {metricsError && <p className="mutedText">{metricsError}</p>}
         {authRequired && (
-          <div className="row" style={{ marginBottom: 12 }}>
-            <input aria-label="Admin username" placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
-            <input aria-label="Admin password" placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button className="secondary" onClick={login} disabled={loggingIn}>{loggingIn ? 'Logging in...' : 'Login'}</button>
+          <form className="row" style={{ marginBottom: 12 }} onSubmit={(e) => { e.preventDefault(); void login(); }}>
+            <input aria-label="Admin username" autoComplete="username" placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input aria-label="Admin password" autoComplete="current-password" placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button type="submit" className="secondary" disabled={loggingIn}>{loggingIn ? 'Logging in...' : 'Login'}</button>
             {loginMsg && <span className="mutedText">{loginMsg}</span>}
-          </div>
+          </form>
         )}
         {!metrics && !metricsError && <p>Loading...</p>}
         {metrics && (
