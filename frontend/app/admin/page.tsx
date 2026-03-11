@@ -107,7 +107,7 @@ export default function AdminPage() {
       <section className="card">
         <h3>Metrics snapshot</h3>
         {metricsError && <p className="mutedText">{metricsError}</p>}
-        {metricsError === 'forbidden' && (
+        {metricsError.toLowerCase().includes('forbidden') && (
           <div className="row" style={{ marginBottom: 12 }}>
             <input placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
             <input placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />

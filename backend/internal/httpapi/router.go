@@ -18,7 +18,7 @@ func NewRouter() http.Handler {
 	svc := checker.New()
 	msvc := monitor.New(svc)
 	usvc := userpanel.New(svc)
-	asvc := &admin.Service{Monitors: msvc, Users: usvc}
+	asvc := admin.NewService(msvc, usvc)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

@@ -33,8 +33,12 @@ type UserStatsProvider interface {
 }
 
 type Service struct {
-	Monitors MonitorStatsProvider
-	Users    UserStatsProvider
+	monitors MonitorStatsProvider
+	users    UserStatsProvider
+}
+
+func NewService(monitors MonitorStatsProvider, users UserStatsProvider) *Service {
+	return &Service{monitors: monitors, users: users}
 }
 
 func (s *Service) Snapshot() Metrics {
@@ -44,11 +48,11 @@ func (s *Service) Snapshot() Metrics {
 
 	monitorStats := MonitorStats{}
 	userStats := UserStats{}
-	if s.Monitors != nil {
-		monitorStats = s.Monitors.MonitorCounts()
+	if s.monitors != nil {
+		monitorStats = s.monitors.MonitorCounts()
 	}
-	if s.Users != nil {
-		userStats = s.Users.UserCounts()
+	if s.users != nil {
+		userStats = s.users.UserCounts()
 	}
 	return Metrics{
 		GeneratedAt:      time.Now().UTC(),
