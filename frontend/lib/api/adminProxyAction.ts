@@ -38,10 +38,10 @@ export function createAdminActionProxy(backendPath: string) {
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase();
       if (contentType.includes('application/json')) {
-        const raw = await res.text();
         try {
-          return NextResponse.json(JSON.parse(raw), { status: res.status, headers: res.headers });
+          return NextResponse.json(await res.clone().json(), { status: res.status, headers: res.headers });
         } catch {
+          const raw = await res.text().catch(() => '');
           return NextResponse.json(
             {
               error: 'backend_unexpected_response',
