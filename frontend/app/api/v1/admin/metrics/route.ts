@@ -25,11 +25,12 @@ export async function GET(req: Request) {
       headers,
     });
 
+    if (res.status === 204) {
+      return new NextResponse(null, { status: 204 });
+    }
+
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     if (contentType.includes('application/json')) {
-      if (res.status === 204) {
-        return new NextResponse(null, { status: 204 });
-      }
       return NextResponse.json(await res.json(), { status: res.status });
     }
 
