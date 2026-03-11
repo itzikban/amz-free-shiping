@@ -17,6 +17,9 @@ export default function AdminPage() {
   const [msg, setMsg] = useState<string>("");
   const [metricsError, setMetricsError] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginMsg, setLoginMsg] = useState("");
   const reqSeq = useRef(0);
 
   async function refresh() {
@@ -42,6 +45,22 @@ export default function AdminPage() {
         setMetricsError('Network error while loading metrics');
       }
     }
+  }
+
+  async function login() {
+    setLoginMsg('');
+    const res = await fetch('/api/v1/admin/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setLoginMsg(body?.error || `login_failed_${res.status}`);
+      return;
+    }
+    setLoginMsg('login_ok');
+    await refresh();
   }
 
   async function runAction(path: string) {
@@ -84,6 +103,14 @@ export default function AdminPage() {
       <section className="card">
         <h3>Metrics snapshot</h3>
         {metricsError && <p className="mutedText">{metricsError}</p>}
+        {metricsError === 'forbidden' && (
+          <div className="row" style={{ marginBottom: 12 }}>
+            <input placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button className="secondary" onClick={login}>Login</button>
+            {loginMsg && <span className="mutedText">{loginMsg}</span>}
+          </div>
+        )}
         {!metrics && !metricsError && <p>Loading...</p>}
         {metrics && (
           <ul>
