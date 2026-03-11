@@ -7,10 +7,6 @@ const ADMIN_ACTION_TIMEOUT_MS = 30_000;
 
 export function createAdminActionProxy(backendPath: string) {
   return async function POST(req: Request) {
-    if (!isAuthorized(req)) {
-      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-    }
-
     let headers: HeadersInit;
     try {
       headers = getBackendAdminHeaders();
@@ -19,6 +15,10 @@ export function createAdminActionProxy(backendPath: string) {
         { error: 'misconfigured_admin_token', detail: err instanceof Error ? err.message : 'unknown' },
         { status: 500 }
       );
+    }
+
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     }
 
     try {
@@ -58,7 +58,7 @@ export function createAdminActionProxy(backendPath: string) {
                 body: raw ? '<redacted upstream response>' : 'invalid or empty JSON body',
               },
             },
-            { status: res.status }
+            { status: res.ok ? 502 : res.status }
           );
         }
       }
@@ -80,7 +80,7 @@ export function createAdminActionProxy(backendPath: string) {
             body: raw ? '<redacted upstream response>' : 'empty response body',
           },
         },
-        { status: res.status }
+        { status: res.ok ? 502 : res.status }
       );
     } catch (err) {
       return NextResponse.json(
