@@ -55,7 +55,14 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    refresh();
+    let active = true;
+    (async () => {
+      if (active) await refresh();
+    })();
+    return () => {
+      active = false;
+      reqSeq.current += 1;
+    };
   }, []);
 
   return (

@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/lib/api/fetchWithTimeout";
 
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
-
-async function fetchWithTimeout(input: URL, init: RequestInit = {}, timeoutMs = 5000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 export async function GET() {
   try {
