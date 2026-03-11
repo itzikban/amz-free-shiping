@@ -20,6 +20,7 @@ export default function AdminPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginMsg, setLoginMsg] = useState("");
+  const [authRequired, setAuthRequired] = useState(false);
   const reqSeq = useRef(0);
 
   async function refresh() {
@@ -31,6 +32,7 @@ export default function AdminPage() {
         if (seq === reqSeq.current) {
           setMetrics(null);
           setMetricsError(body?.error || 'Failed to load metrics');
+          setAuthRequired(res.status === 401 || res.status === 403);
         }
         return;
       }
@@ -38,11 +40,13 @@ export default function AdminPage() {
       if (seq === reqSeq.current) {
         setMetrics(data);
         setMetricsError('');
+        setAuthRequired(false);
       }
     } catch {
       if (seq === reqSeq.current) {
         setMetrics(null);
         setMetricsError('Network error while loading metrics');
+        setAuthRequired(false);
       }
     }
   }
@@ -107,10 +111,10 @@ export default function AdminPage() {
       <section className="card">
         <h3>Metrics snapshot</h3>
         {metricsError && <p className="mutedText">{metricsError}</p>}
-        {metricsError.toLowerCase().includes('forbidden') && (
+        {authRequired && (
           <div className="row" style={{ marginBottom: 12 }}>
-            <input placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
-            <input placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input aria-label="Admin username" placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input aria-label="Admin password" placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             <button className="secondary" onClick={login}>Login</button>
             {loginMsg && <span className="mutedText">{loginMsg}</span>}
           </div>
