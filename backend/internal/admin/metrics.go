@@ -38,6 +38,10 @@ type Service struct {
 }
 
 func (s *Service) Snapshot() Metrics {
+	if s == nil {
+		return Metrics{}
+	}
+
 	monitorStats := MonitorStats{}
 	userStats := UserStats{}
 	if s.Monitors != nil {
