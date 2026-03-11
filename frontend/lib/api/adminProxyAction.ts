@@ -5,7 +5,7 @@ import { getBackendAdminHeaders, isAuthorized } from "@/lib/api/adminAuth";
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
 const ADMIN_ACTION_TIMEOUT_MS = 30_000;
 
-function createUnexpectedResponse(
+export function createUnexpectedResponse(
   res: Response,
   backendPath: string,
   contentType: string,

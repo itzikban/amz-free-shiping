@@ -174,7 +174,12 @@ func NewRouter() http.Handler {
 			methodNotAllowed(w, http.MethodPost)
 			return
 		}
-		writeJSON(w, http.StatusOK, admin.ReplayFailedJobs())
+		resp := admin.ReplayFailedJobs()
+		status := http.StatusOK
+		if !resp.OK {
+			status = http.StatusNotImplemented
+		}
+		writeJSON(w, status, resp)
 	})
 
 	mux.HandleFunc("/v1/admin/actions/retry-failed-notifications", func(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +190,12 @@ func NewRouter() http.Handler {
 			methodNotAllowed(w, http.MethodPost)
 			return
 		}
-		writeJSON(w, http.StatusOK, admin.RetryFailedNotifications())
+		resp := admin.RetryFailedNotifications()
+		status := http.StatusOK
+		if !resp.OK {
+			status = http.StatusNotImplemented
+		}
+		writeJSON(w, status, resp)
 	})
 
 	return mux

@@ -49,18 +49,22 @@ export default function AdminPage() {
 
   async function login() {
     setLoginMsg('');
-    const res = await fetch('/api/v1/admin/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setLoginMsg(body?.error || `login_failed_${res.status}`);
-      return;
+    try {
+      const res = await fetch('/api/v1/admin/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setLoginMsg(body?.error || `login_failed_${res.status}`);
+        return;
+      }
+      setLoginMsg('login_ok');
+      await refresh();
+    } catch (err) {
+      setLoginMsg(err instanceof Error ? err.message : 'network_error');
     }
-    setLoginMsg('login_ok');
-    await refresh();
   }
 
   async function runAction(path: string) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/lib/api/fetchWithTimeout";
 import { getBackendAdminHeaders, isAuthorized } from "@/lib/api/adminAuth";
+import { createUnexpectedResponse } from "@/lib/api/adminProxyAction";
 
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
 
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   } catch (err) {
     return NextResponse.json(
       { error: 'misconfigured_admin_token', detail: err instanceof Error ? err.message : 'unknown' },
-      { status: 422 }
+      { status: 500 }
     );
   }
 
@@ -31,24 +32,18 @@ export async function GET(req: Request) {
 
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     if (contentType.includes('application/json')) {
-      return NextResponse.json(await res.json(), { status: res.status });
+      try {
+        return NextResponse.json(await res.clone().json(), { status: res.status });
+      } catch (err) {
+        return NextResponse.json(
+          { error: 'backend_unreachable', detail: err instanceof Error ? err.message : 'invalid_json' },
+          { status: 502 }
+        );
+      }
     }
 
-    const raw = await res.text();
-    if (raw) {
-      console.error('admin metrics route: upstream returned non-JSON response', {
-        status: res.status,
-        contentType: contentType || 'unknown',
-        body: '<REDACTED_BODY>',
-      });
-    }
-    return NextResponse.json(
-      {
-        error: 'backend_unexpected_response',
-        detail: { contentType: contentType || 'unknown', body: raw ? '<redacted upstream response>' : 'empty response body' },
-      },
-      { status: 502 }
-    );
+    const raw = await res.text().catch(() => '');
+    return createUnexpectedResponse(res, '/v1/admin/metrics', contentType, raw, 'non-JSON response');
   } catch (err) {
     return NextResponse.json(
       { error: 'backend_unreachable', detail: err instanceof Error ? err.message : 'unknown' },
