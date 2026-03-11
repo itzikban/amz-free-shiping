@@ -40,7 +40,7 @@ export function createAdminActionProxy(backendPath: string) {
       if (contentType.includes('application/json')) {
         const raw = await res.text();
         try {
-          return NextResponse.json(raw ? JSON.parse(raw) : null, { status: res.status, headers: res.headers });
+          return NextResponse.json(JSON.parse(raw), { status: res.status, headers: res.headers });
         } catch {
           return NextResponse.json(
             {
