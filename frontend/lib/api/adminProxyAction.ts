@@ -47,7 +47,7 @@ export function createAdminActionProxy(backendPath: string) {
               backendPath,
               status: res.status,
               contentType,
-              rawPreview: raw.slice(0, 200),
+              body: '<REDACTED_BODY>',
             });
           }
           return NextResponse.json(
@@ -69,7 +69,7 @@ export function createAdminActionProxy(backendPath: string) {
           backendPath,
           status: res.status,
           contentType,
-          rawPreview: raw.slice(0, 200),
+          body: '<REDACTED_BODY>',
         });
       }
       return NextResponse.json(
