@@ -17,7 +17,7 @@ export function createAdminActionProxy(backendPath: string) {
     } catch (err) {
       return NextResponse.json(
         { error: 'misconfigured_admin_token', detail: err instanceof Error ? err.message : 'unknown' },
-        { status: 422 }
+        { status: 500 }
       );
     }
 
@@ -47,7 +47,7 @@ export function createAdminActionProxy(backendPath: string) {
               error: 'backend_unexpected_response',
               detail: {
                 contentType: contentType || 'unknown',
-                body: raw || 'invalid or empty JSON body',
+                body: raw ? 'upstream body omitted' : 'invalid or empty JSON body',
               },
             },
             { status: res.status }
@@ -61,7 +61,7 @@ export function createAdminActionProxy(backendPath: string) {
           error: 'backend_unexpected_response',
           detail: {
             contentType: contentType || 'unknown',
-            body: raw || 'empty response body',
+            body: raw ? 'upstream body omitted' : 'empty response body',
           },
         },
         { status: res.status }
