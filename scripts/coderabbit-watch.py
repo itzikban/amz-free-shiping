@@ -219,9 +219,26 @@ def main():
         state["prs"][num] = prev
 
         if actionable == 0:
-            log(
-                f"MERGE-ASK REMINDER PR #{num}: actionable=0. Summarize resolved/remaining and ask user if they want merge."
-            )
+            # Auto-merge policy: when CodeRabbit actionable is zero and PR is clean.
+            try:
+                pr_meta = run_json([
+                    "gh", "pr", "view", num,
+                    "--json", "state,mergeStateStatus,isDraft,url,title"
+                ])
+                if (
+                    pr_meta.get("state") == "OPEN"
+                    and not pr_meta.get("isDraft")
+                    and pr_meta.get("mergeStateStatus") == "CLEAN"
+                ):
+                    run(["gh", "pr", "merge", num, "--merge", "--delete-branch=false"])
+                    log(f"AUTO-MERGED PR #{num}: {pr_meta.get('title','')}")
+                else:
+                    log(
+                        f"AUTO-MERGE SKIPPED PR #{num}: state={pr_meta.get('state')} "
+                        f"draft={pr_meta.get('isDraft')} mergeState={pr_meta.get('mergeStateStatus')}"
+                    )
+            except Exception as e:
+                log(f"ERROR auto-merging PR #{num}: {e}")
 
     open_nums = {str(pr["number"]) for pr in prs}
     for k in list(state["prs"].keys()):
@@ -231,8 +248,8 @@ def main():
     save_state(state)
 
     reminder = (
-        "REMINDER: After resolving CodeRabbit comments, summarize resolved/remaining "
-        "items to the user and explicitly ask whether to merge the PR."
+        "REMINDER: Auto-loop active. Resolve CodeRabbit findings, run checks, retrigger review, "
+        "and auto-merge when actionable=0 and PR is CLEAN."
     )
     log(reminder)
     print(reminder)
