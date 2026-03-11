@@ -104,6 +104,10 @@ def parse_confirmed_fixed_count(issue_comment_body: str):
     return int(m.group(1))
 
 
+REVIEW_RESPONSE_WAIT_SECONDS = 120
+ESCALATION_SECONDS = 300
+
+
 def main():
     try:
         prs = run_json([
