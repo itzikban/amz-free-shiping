@@ -55,7 +55,7 @@ export function createAdminActionProxy(backendPath: string) {
         }
       }
 
-      const raw = await res.text();
+      const raw = await res.text().catch(() => '');
       return NextResponse.json(
         {
           error: 'backend_unexpected_response',
@@ -64,7 +64,7 @@ export function createAdminActionProxy(backendPath: string) {
             body: raw || 'empty response body',
           },
         },
-        { status: 502 }
+        { status: res.status, headers: res.headers }
       );
     } catch (err) {
       return NextResponse.json(
