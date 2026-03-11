@@ -1,5 +1,7 @@
 # ITZ-8 Setup Redis job queues and worker runtime
 
+Status: Closed ✅
+
 ## Scope
 Introduce a queue runtime for check/notify jobs with retry and dead-letter behavior.
 

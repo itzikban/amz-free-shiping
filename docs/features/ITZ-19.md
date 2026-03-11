@@ -1,5 +1,7 @@
 # ITZ-19 Admin metrics + operations API (chunk 1)
 
+Status: Closed ✅
+
 ## Implemented
 - Added admin metrics service abstraction:
   - `backend/internal/admin/metrics.go`
