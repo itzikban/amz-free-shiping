@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Metrics = {
   generated_at: string;
@@ -15,20 +15,48 @@ type Metrics = {
 export default function AdminPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [msg, setMsg] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const reqSeq = useRef(0);
 
   async function refresh() {
-    const res = await fetch('/api/v1/admin/metrics');
-    if (res.ok) setMetrics(await res.json());
+    const seq = ++reqSeq.current;
+    try {
+      const res = await fetch('/api/v1/admin/metrics');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setMsg(body?.error || 'Failed to load metrics');
+        return;
+      }
+      const data = await res.json();
+      if (seq === reqSeq.current) {
+        setMetrics(data);
+      }
+    } catch {
+      setMsg('Network error while loading metrics');
+    }
   }
 
   async function runAction(path: string) {
-    const res = await fetch(path, { method: 'POST' });
-    const body = await res.json();
-    setMsg(body?.message || body?.error || 'done');
-    await refresh();
+    setLoading(true);
+    try {
+      const res = await fetch(path, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(body?.error || 'Action failed');
+        return;
+      }
+      setMsg(body?.message || 'Action completed');
+      await refresh();
+    } catch {
+      setMsg('Network error while running action');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   return (
     <main className="container">
@@ -56,8 +84,12 @@ export default function AdminPage() {
       <section className="card">
         <h3>Actions</h3>
         <div className="row">
-          <button className="secondary" onClick={() => runAction('/api/v1/admin/actions/replay-failed-jobs')}>Replay failed jobs</button>
-          <button className="secondary" onClick={() => runAction('/api/v1/admin/actions/retry-failed-notifications')}>Retry failed notifications</button>
+          <button className="secondary" disabled={loading} onClick={() => runAction('/api/v1/admin/actions/replay-failed-jobs')}>
+            Replay failed jobs
+          </button>
+          <button className="secondary" disabled={loading} onClick={() => runAction('/api/v1/admin/actions/retry-failed-notifications')}>
+            Retry failed notifications
+          </button>
         </div>
         {msg && <p className="mutedText">Result: {msg}</p>}
       </section>
