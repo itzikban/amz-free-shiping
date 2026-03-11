@@ -242,6 +242,7 @@ func (s *Service) ClearNotifications() {
 	s.notifications = []Notification{}
 }
 
+// MonitorCounts returns aggregate monitor/notification counters for admin metrics.
 func (s *Service) MonitorCounts() (total, running, stopped, notifications int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
