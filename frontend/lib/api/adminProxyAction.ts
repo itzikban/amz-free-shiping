@@ -43,10 +43,11 @@ export function createAdminActionProxy(backendPath: string) {
     try {
       headers = getBackendAdminHeaders();
     } catch (err) {
-      return NextResponse.json(
-        { error: 'misconfigured_admin_token', detail: err instanceof Error ? err.message : 'unknown' },
-        { status: 500 }
-      );
+      console.error('adminProxyAction: admin token misconfigured', {
+        backendPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json({ error: 'misconfigured_admin_token' }, { status: 500 });
     }
 
     if (!isAuthorized(req)) {
@@ -69,7 +70,7 @@ export function createAdminActionProxy(backendPath: string) {
       }
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase();
-      if (contentType.includes('application/json')) {
+      if (contentType.includes('json')) {
         try {
           return NextResponse.json(await res.clone().json(), { status: res.status });
         } catch {
