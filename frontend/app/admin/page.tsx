@@ -25,6 +25,7 @@ export default function AdminPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         if (seq === reqSeq.current) {
+          setMetrics(null);
           setMsg(body?.error || 'Failed to load metrics');
         }
         return;
@@ -35,6 +36,7 @@ export default function AdminPage() {
       }
     } catch {
       if (seq === reqSeq.current) {
+        setMetrics(null);
         setMsg('Network error while loading metrics');
       }
     }
