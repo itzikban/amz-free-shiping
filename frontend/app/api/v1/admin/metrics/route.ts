@@ -34,11 +34,9 @@ export async function GET(req: Request) {
     if (contentType.includes('application/json')) {
       try {
         return NextResponse.json(await res.clone().json(), { status: res.status });
-      } catch (err) {
-        return NextResponse.json(
-          { error: 'backend_unreachable', detail: err instanceof Error ? err.message : 'invalid_json' },
-          { status: 502 }
-        );
+      } catch {
+        const raw = await res.text().catch(() => '');
+        return createUnexpectedResponse(res, '/v1/admin/metrics', contentType, raw, 'invalid JSON');
       }
     }
 
