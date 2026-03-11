@@ -70,6 +70,7 @@ export function createAdminActionProxy(backendPath: string) {
       }
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      // Accept application/json as well as +json media types (e.g. application/problem+json).
       if (contentType.includes('json')) {
         try {
           return NextResponse.json(await res.clone().json(), { status: res.status });
