@@ -15,6 +15,7 @@ type Metrics = {
 export default function AdminPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [msg, setMsg] = useState<string>("");
+  const [metricsError, setMetricsError] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const reqSeq = useRef(0);
 
@@ -26,18 +27,19 @@ export default function AdminPage() {
         const body = await res.json().catch(() => ({}));
         if (seq === reqSeq.current) {
           setMetrics(null);
-          setMsg(body?.error || 'Failed to load metrics');
+          setMetricsError(body?.error || 'Failed to load metrics');
         }
         return;
       }
       const data = await res.json();
       if (seq === reqSeq.current) {
         setMetrics(data);
+        setMetricsError('');
       }
     } catch {
       if (seq === reqSeq.current) {
         setMetrics(null);
-        setMsg('Network error while loading metrics');
+        setMetricsError('Network error while loading metrics');
       }
     }
   }
@@ -81,7 +83,8 @@ export default function AdminPage() {
 
       <section className="card">
         <h3>Metrics snapshot</h3>
-        {!metrics && <p>Loading...</p>}
+        {metricsError && <p className="mutedText">{metricsError}</p>}
+        {!metrics && !metricsError && <p>Loading...</p>}
         {metrics && (
           <ul>
             <li>Monitors total: {metrics.monitors_total}</li>
