@@ -116,6 +116,12 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 	return item, nil
 }
 
+func (s *Service) UserCounts() (trackedItems, alerts int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.items), len(s.alerts)
+}
+
 func makeID(prefix string, n int) string { return prefix + "-" + time.Now().UTC().Format("150405") + "-" + fmtInt(n) }
 func fmtInt(i int) string {
 	if i == 0 { return "0" }

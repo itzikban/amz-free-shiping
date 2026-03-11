@@ -241,3 +241,33 @@ func (s *Service) ClearNotifications() {
 	defer s.mu.Unlock()
 	s.notifications = []Notification{}
 }
+
+func (s *Service) MonitorCounts() (total, running, stopped, notifications int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	total = len(s.monitors)
+	for _, m := range s.monitors {
+		if m.Running {
+			running++
+		} else {
+			stopped++
+		}
+	}
+	notifications = len(s.notifications)
+	return
+}
+
+func (s *Service) MonitorCounts() (total, running, stopped, notifications int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	total = len(s.monitors)
+	for _, m := range s.monitors {
+		if m.Running {
+			running++
+		} else {
+			stopped++
+		}
+	}
+	notifications = len(s.notifications)
+	return
+}

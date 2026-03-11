@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
 	"free-ship-checker-go/internal/monitor"
 	"free-ship-checker-go/internal/userpanel"
@@ -15,6 +16,7 @@ func NewRouter() http.Handler {
 	svc := checker.New()
 	msvc := monitor.New(svc)
 	usvc := userpanel.New(svc)
+	asvc := &admin.Service{Monitors: msvc, Users: usvc}
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -149,6 +151,30 @@ func NewRouter() http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"alerts": usvc.ListAlerts()})
+	})
+
+	mux.HandleFunc("/v1/admin/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		writeJSON(w, http.StatusOK, asvc.Snapshot())
+	})
+
+	mux.HandleFunc("/v1/admin/actions/replay-failed-jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		writeJSON(w, http.StatusOK, admin.ReplayFailedJobs())
+	})
+
+	mux.HandleFunc("/v1/admin/actions/retry-failed-notifications", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		writeJSON(w, http.StatusOK, admin.RetryFailedNotifications())
 	})
 
 	return mux
