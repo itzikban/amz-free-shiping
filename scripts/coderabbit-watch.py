@@ -10,6 +10,10 @@ REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 STATE_PATH = os.path.join(REPO_DIR, ".coderabbit-watch-state.json")
 LOG_PATH = os.path.join(REPO_DIR, ".coderabbit-watch.log")
 
+REVIEW_RESPONSE_WAIT_SECONDS = 120
+ESCALATION_SECONDS = 300
+SAME_ACTIONABLE_LIMIT = 2
+
 
 def run(cmd):
     return subprocess.check_output(cmd, cwd=REPO_DIR, text=True).strip()
@@ -97,15 +101,10 @@ def parse_actionable_count(review_body: str):
 
 
 def parse_confirmed_fixed_count(issue_comment_body: str):
-    # CodeRabbit often writes: "All N previously confirmed fixes remain in place"
     m = re.search(r"all\s+(\d+)\s+previously\s+confirmed\s+fixes", issue_comment_body or "", flags=re.I)
     if not m:
         return None
     return int(m.group(1))
-
-
-REVIEW_RESPONSE_WAIT_SECONDS = 120
-ESCALATION_SECONDS = 300
 
 
 def main():
@@ -120,6 +119,7 @@ def main():
 
     state = load_state()
     state.setdefault("prs", {})
+    any_event = False
 
     for pr in prs:
         if pr.get("isDraft"):
@@ -131,8 +131,8 @@ def main():
             continue
 
         prev = state["prs"].get(num, {})
+        now = datetime.now(timezone.utc)
 
-        # Gather latest CodeRabbit signals
         try:
             rev = latest_coderabbit_review(num)
             cm = latest_coderabbit_issue_comment(num)
@@ -146,33 +146,41 @@ def main():
         actionable = parse_actionable_count((rev or {}).get("body", "")) if rev else None
         confirmed_fixed = parse_confirmed_fixed_count((cm or {}).get("body", "")) if cm else None
 
-        # Inline fingerprint: detect unseen bot inline comments (might be missed by summary)
         inline_ids = [x["id"] for x in inline]
         inline_fp = f"{len(inline_ids)}:{inline_ids[-1] if inline_ids else 0}"
 
-        changed_activity = (
+        activity_changed = (
             prev.get("last_coderabbit_review_id") != rev_id
             or prev.get("last_coderabbit_comment_id") != cm_id
             or prev.get("last_inline_fingerprint") != inline_fp
         )
+        actionable_changed = prev.get("last_coderabbit_actionable") != actionable
+        sha_changed = prev.get("last_head_sha") != sha
 
-        if changed_activity:
-            log(f"PR #{num} CodeRabbit activity updated (actionable={actionable}, inline={len(inline_ids)})")
+        if sha_changed:
+            prev["last_requested_review_sha"] = None
+            prev["last_requested_review_at"] = None
+            prev["retrigger_count"] = 0
+            prev["same_actionable_cycles"] = 0
+            prev["escalated"] = False
+            log(f"PR #{num} new SHA detected {sha[:12]}")
+            any_event = True
+
+        if activity_changed:
             prev["pending_since"] = None
             prev["retrigger_count"] = 0
             prev["escalated"] = False
+            log(f"PR #{num} CodeRabbit activity updated (actionable={actionable}, inline={len(inline_ids)})")
+            any_event = True
 
-        # SHA-gated retrigger: only retrigger if current SHA wasn't requested yet
-        last_requested_sha = prev.get("last_requested_review_sha")
-        now = datetime.now(timezone.utc)
+        if actionable_changed:
+            log(f"PR #{num} actionable changed: {prev.get('last_coderabbit_actionable')} -> {actionable}")
+            prev["same_actionable_cycles"] = 0
+            any_event = True
+        elif actionable is not None and actionable > 0 and not activity_changed:
+            prev["same_actionable_cycles"] = int(prev.get("same_actionable_cycles") or 0) + 1
 
-        # determine if still pending unresolved work
-        pending_unresolved = False
-        if actionable is not None and actionable > 0:
-            pending_unresolved = True
-        elif actionable is None and inline_ids:
-            # fallback: if no actionable summary but inline comments exist, treat as pending
-            pending_unresolved = True
+        pending_unresolved = actionable is not None and actionable > 0
 
         if pending_unresolved:
             if not prev.get("pending_since"):
@@ -180,28 +188,61 @@ def main():
             pending_since = parse_iso(prev.get("pending_since")) or now
             elapsed = (now - pending_since).total_seconds()
             retrigger_count = int(prev.get("retrigger_count") or 0)
+            last_requested_sha = prev.get("last_requested_review_sha")
+            req_at = parse_iso(prev.get("last_requested_review_at"))
 
-            if elapsed >= 120 and retrigger_count < 1 and last_requested_sha != sha:
+            if sha_changed and last_requested_sha != sha:
                 try:
-                    body = (
-                        "@coderabbitai review\n\n"
-                        "Auto-retrigger (SHA-gated): unresolved findings detected and this commit SHA has not been requested yet."
-                    )
-                    run(["gh", "pr", "comment", num, "--body", body])
-                    prev["retrigger_count"] = retrigger_count + 1
+                    run(["gh", "pr", "comment", num, "--body", "@coderabbitai review\n\nAuto-request on new SHA."])
                     prev["last_requested_review_sha"] = sha
                     prev["last_requested_review_at"] = now.isoformat()
-                    log(f"PR #{num} retriggered CodeRabbit on new SHA {sha[:12]}")
+                    prev["retrigger_count"] = 0
+                    log(f"PR #{num} requested CodeRabbit review on new SHA {sha[:12]}")
+                    any_event = True
                 except Exception as e:
-                    log(f"ERROR retriggering PR #{num}: {e}")
+                    log(f"ERROR requesting review PR #{num}: {e}")
 
-            if elapsed >= 300 and not prev.get("escalated"):
-                log(f"ESCALATION PR #{num}: unresolved findings for 5+ minutes (actionable={actionable}, inline={len(inline_ids)})")
+            no_fresh_activity_since_request = False
+            if req_at:
+                latest_activity_ts = max(
+                    [t for t in [parse_iso((rev or {}).get("submitted_at")), parse_iso((cm or {}).get("created_at"))] if t],
+                    default=None,
+                )
+                no_fresh_activity_since_request = latest_activity_ts is None or latest_activity_ts <= req_at
+
+            if (
+                req_at
+                and no_fresh_activity_since_request
+                and (now - req_at).total_seconds() >= REVIEW_RESPONSE_WAIT_SECONDS
+                and retrigger_count < 1
+            ):
+                try:
+                    run(["gh", "pr", "comment", num, "--body", "@coderabbitai review\n\nAuto-retrigger after 2m without bot activity."])
+                    prev["retrigger_count"] = retrigger_count + 1
+                    prev["last_requested_review_at"] = now.isoformat()
+                    log(f"PR #{num} auto-retriggered after 2m no-response")
+                    any_event = True
+                except Exception as e:
+                    log(f"ERROR auto-retriggering PR #{num}: {e}")
+
+            if elapsed >= ESCALATION_SECONDS and not prev.get("escalated"):
+                log(f"ESCALATION PR #{num}: unresolved findings for 5+ minutes (actionable={actionable})")
                 prev["escalated"] = True
+                any_event = True
+
+            if int(prev.get("same_actionable_cycles") or 0) >= SAME_ACTIONABLE_LIMIT and not prev.get("stale_alerted"):
+                log(f"HUMAN-NEEDED PR #{num}: actionable stuck at {actionable} for {prev.get('same_actionable_cycles')} cycles")
+                prev["stale_alerted"] = True
+                any_event = True
         else:
             prev["pending_since"] = None
             prev["retrigger_count"] = 0
             prev["escalated"] = False
+            prev["same_actionable_cycles"] = 0
+            prev["stale_alerted"] = False
+            if actionable == 0 and (actionable_changed or activity_changed or sha_changed):
+                log(f"MERGE-READY PR #{num}: actionable=0 and ready for user merge decision.")
+                any_event = True
 
         prev.update({
             "title": pr.get("title", ""),
@@ -218,12 +259,6 @@ def main():
         })
         state["prs"][num] = prev
 
-        if actionable == 0:
-            log(
-                f"MERGE-READY PR #{num}: actionable=0 and ready for user merge decision. "
-                "Summarize resolved/remaining and ask user whether to merge."
-            )
-
     open_nums = {str(pr["number"]) for pr in prs}
     for k in list(state["prs"].keys()):
         if k not in open_nums:
@@ -231,12 +266,10 @@ def main():
 
     save_state(state)
 
-    reminder = (
-        "REMINDER: Auto-loop active. Resolve CodeRabbit findings, run checks, retrigger review. "
-        "When actionable=0, ask user for merge decision (do not auto-merge)."
-    )
-    log(reminder)
-    print(reminder)
+    if any_event:
+        print("EVENT")
+    else:
+        print("NOOP")
     return 0
 
 
