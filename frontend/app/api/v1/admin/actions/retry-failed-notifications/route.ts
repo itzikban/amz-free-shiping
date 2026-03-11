@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/lib/api/fetchWithTimeout";
+import { getBackendAdminHeaders, isAuthorized } from "@/lib/api/adminAuth";
 
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
-const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN;
-
-function isAuthorized(req: Request): boolean {
-  const sameOrigin = req.headers.get('sec-fetch-site') === 'same-origin';
-  if (sameOrigin) return true;
-  if (!ADMIN_API_TOKEN) return false;
-  return req.headers.get('x-admin-token') === ADMIN_API_TOKEN;
-}
 
 export async function POST(req: Request) {
   if (!isAuthorized(req)) {
@@ -20,8 +13,12 @@ export async function POST(req: Request) {
     const res = await fetchWithTimeout(new URL('/v1/admin/actions/retry-failed-notifications', BACKEND_BASE_URL), {
       method: 'POST',
       cache: 'no-store',
-      headers: { 'X-Admin-Token': ADMIN_API_TOKEN as string },
+      headers: getBackendAdminHeaders(),
     });
+
+    if (res.status === 204) {
+      return NextResponse.json({}, { status: 204 });
+    }
 
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     if (contentType.includes('application/json')) {
@@ -31,10 +28,13 @@ export async function POST(req: Request) {
     const raw = await res.text();
     return NextResponse.json(
       {
-        error: 'backend_invalid_response',
-        detail: raw ? raw.slice(0, 200) : 'empty response body',
+        error: 'backend_unexpected_response',
+        detail: {
+          contentType: contentType || 'unknown',
+          body: raw ? raw.slice(0, 200) : 'empty response body',
+        },
       },
-      { status: res.status }
+      { status: 502 }
     );
   } catch (err) {
     return NextResponse.json(
