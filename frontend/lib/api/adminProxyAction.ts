@@ -42,12 +42,20 @@ export function createAdminActionProxy(backendPath: string) {
           return NextResponse.json(await res.clone().json(), { status: res.status });
         } catch {
           const raw = await res.text().catch(() => '');
+          if (raw) {
+            console.error('adminProxyAction: upstream returned invalid JSON', {
+              backendPath,
+              status: res.status,
+              contentType,
+              rawPreview: raw.slice(0, 200),
+            });
+          }
           return NextResponse.json(
             {
               error: 'backend_unexpected_response',
               detail: {
                 contentType: contentType || 'unknown',
-                body: raw ? 'upstream body omitted' : 'invalid or empty JSON body',
+                body: raw ? '<redacted upstream response>' : 'invalid or empty JSON body',
               },
             },
             { status: res.status }
@@ -56,12 +64,20 @@ export function createAdminActionProxy(backendPath: string) {
       }
 
       const raw = await res.text().catch(() => '');
+      if (raw) {
+        console.error('adminProxyAction: upstream returned non-JSON response', {
+          backendPath,
+          status: res.status,
+          contentType,
+          rawPreview: raw.slice(0, 200),
+        });
+      }
       return NextResponse.json(
         {
           error: 'backend_unexpected_response',
           detail: {
             contentType: contentType || 'unknown',
-            body: raw ? 'upstream body omitted' : 'empty response body',
+            body: raw ? '<redacted upstream response>' : 'empty response body',
           },
         },
         { status: res.status }

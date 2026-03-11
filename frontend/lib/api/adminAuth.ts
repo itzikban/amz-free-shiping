@@ -13,7 +13,11 @@ function getCookie(req: Request, name: string): string {
     if (eq <= 0) continue;
     const k = part.slice(0, eq).trim();
     if (k !== name) continue;
-    return decodeURIComponent(part.slice(eq + 1));
+    try {
+      return decodeURIComponent(part.slice(eq + 1));
+    } catch {
+      return '';
+    }
   }
   return '';
 }
