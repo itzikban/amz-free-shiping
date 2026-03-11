@@ -3,15 +3,19 @@ package admin
 import "testing"
 
 type mon struct{}
-func (m mon) MonitorCounts() (int, int, int, int) { return 4, 1, 3, 8 }
+
+func (m mon) MonitorCounts() MonitorStats {
+	return MonitorStats{Total: 4, Running: 1, Stopped: 3, Notifications: 8}
+}
 
 type usr struct{}
-func (u usr) UserCounts() (int, int) { return 11, 5 }
+
+func (u usr) UserCounts() UserStats { return UserStats{TrackedItems: 11, Alerts: 5} }
 
 func TestSnapshot(t *testing.T) {
 	svc := &Service{Monitors: mon{}, Users: usr{}}
 	s := svc.Snapshot()
-	if s.MonitorsTotal != 4 || s.MonitorsRunning != 1 || s.Notifications != 8 {
+	if s.MonitorsTotal != 4 || s.MonitorsRunning != 1 || s.MonitorsStopped != 3 || s.Notifications != 8 {
 		t.Fatalf("bad monitor aggregation: %+v", s)
 	}
 	if s.UserTrackedItems != 11 || s.UserAlerts != 5 {

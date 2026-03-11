@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
 )
 
@@ -116,15 +117,19 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 	return item, nil
 }
 
-func (s *Service) UserCounts() (trackedItems, alerts int) {
+func (s *Service) UserCounts() admin.UserStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.items), len(s.alerts)
+	return admin.UserStats{TrackedItems: len(s.items), Alerts: len(s.alerts)}
 }
 
-func makeID(prefix string, n int) string { return prefix + "-" + time.Now().UTC().Format("150405") + "-" + fmtInt(n) }
+func makeID(prefix string, n int) string {
+	return prefix + "-" + time.Now().UTC().Format("150405") + "-" + fmtInt(n)
+}
 func fmtInt(i int) string {
-	if i == 0 { return "0" }
+	if i == 0 {
+		return "0"
+	}
 	buf := [20]byte{}
 	bp := len(buf)
 	for i > 0 {

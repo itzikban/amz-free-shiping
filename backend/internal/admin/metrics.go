@@ -12,12 +12,24 @@ type Metrics struct {
 	UserAlerts       int       `json:"user_alerts"`
 }
 
+type MonitorStats struct {
+	Total         int
+	Running       int
+	Stopped       int
+	Notifications int
+}
+
 type MonitorStatsProvider interface {
-	MonitorCounts() (total, running, stopped, notifications int)
+	MonitorCounts() MonitorStats
+}
+
+type UserStats struct {
+	TrackedItems int
+	Alerts       int
 }
 
 type UserStatsProvider interface {
-	UserCounts() (trackedItems, alerts int)
+	UserCounts() UserStats
 }
 
 type Service struct {
@@ -26,21 +38,21 @@ type Service struct {
 }
 
 func (s *Service) Snapshot() Metrics {
-	total, running, stopped, notifications := 0, 0, 0, 0
-	tracked, alerts := 0, 0
+	monitorStats := MonitorStats{}
+	userStats := UserStats{}
 	if s.Monitors != nil {
-		total, running, stopped, notifications = s.Monitors.MonitorCounts()
+		monitorStats = s.Monitors.MonitorCounts()
 	}
 	if s.Users != nil {
-		tracked, alerts = s.Users.UserCounts()
+		userStats = s.Users.UserCounts()
 	}
 	return Metrics{
 		GeneratedAt:      time.Now().UTC(),
-		MonitorsTotal:    total,
-		MonitorsRunning:  running,
-		MonitorsStopped:  stopped,
-		Notifications:    notifications,
-		UserTrackedItems: tracked,
-		UserAlerts:       alerts,
+		MonitorsTotal:    monitorStats.Total,
+		MonitorsRunning:  monitorStats.Running,
+		MonitorsStopped:  monitorStats.Stopped,
+		Notifications:    monitorStats.Notifications,
+		UserTrackedItems: userStats.TrackedItems,
+		UserAlerts:       userStats.Alerts,
 	}
 }

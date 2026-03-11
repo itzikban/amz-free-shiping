@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
 	"github.com/google/uuid"
 )
@@ -243,17 +244,17 @@ func (s *Service) ClearNotifications() {
 }
 
 // MonitorCounts returns aggregate monitor/notification counters for admin metrics.
-func (s *Service) MonitorCounts() (total, running, stopped, notifications int) {
+func (s *Service) MonitorCounts() admin.MonitorStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	total = len(s.monitors)
+	stats := admin.MonitorStats{Total: len(s.monitors)}
 	for _, m := range s.monitors {
 		if m.Running {
-			running++
+			stats.Running++
 		} else {
-			stopped++
+			stats.Stopped++
 		}
 	}
-	notifications = len(s.notifications)
-	return
+	stats.Notifications = len(s.notifications)
+	return stats
 }
