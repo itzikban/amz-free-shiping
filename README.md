@@ -48,3 +48,7 @@ API runs on `:8085` by default.
 ## Notes
 - Feature implementation docs are tracked under `docs/features/`.
 - End-to-end smoke check script: `tests/smoke-ui-backend.sh`
+
+
+## Working process
+- See `WORKING-AGREEMENT.md` for collaboration rules, delivery workflow, and definition of done.
