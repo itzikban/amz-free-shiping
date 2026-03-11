@@ -50,5 +50,20 @@ API runs on `:8085` by default.
 - End-to-end smoke check script: `tests/smoke-ui-backend.sh`
 
 
+## Where to start (planning + execution)
+
+1. Read product plan summary: `docs/PRODUCT_PLAN.md`
+2. Read full original planning request: `docs/PRODUCT_PLAN_REQUEST.md`
+3. Open static UI perspective mock: `mock-ui/index.html`
+4. Pick next Linear ticket from team `ITZ` backlog
+5. Implement in small PRs with tests + verification notes
+
+## Ticket tracking rule (important)
+When a ticket is closed, update **both**:
+- Linear issue state -> `Done`
+- matching local feature doc under `docs/features/ITZ-XX.md` with `Status: Closed ✅`
+
+This keeps repo docs and Linear in sync and makes progress easy to track across sessions.
+
 ## Working process
 - See `WORKING-AGREEMENT.md` for collaboration rules, delivery workflow, and definition of done.
