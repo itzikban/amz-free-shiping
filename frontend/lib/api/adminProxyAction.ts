@@ -5,17 +5,6 @@ import { getBackendAdminHeaders, isAuthorized } from "@/lib/api/adminAuth";
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
 const ADMIN_ACTION_TIMEOUT_MS = 30_000;
 
-function getSafeProxyHeaders(source: Headers) {
-  const headers = new Headers();
-  for (const name of ['cache-control', 'etag', 'last-modified']) {
-    const value = source.get(name);
-    if (value) {
-      headers.set(name, value);
-    }
-  }
-  return headers;
-}
-
 export function createAdminActionProxy(backendPath: string) {
   return async function POST(req: Request) {
     if (!isAuthorized(req)) {
@@ -48,10 +37,9 @@ export function createAdminActionProxy(backendPath: string) {
       }
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase();
-      const responseHeaders = getSafeProxyHeaders(res.headers);
       if (contentType.includes('application/json')) {
         try {
-          return NextResponse.json(await res.clone().json(), { status: res.status, headers: responseHeaders });
+          return NextResponse.json(await res.clone().json(), { status: res.status });
         } catch {
           const raw = await res.text().catch(() => '');
           return NextResponse.json(
@@ -62,7 +50,7 @@ export function createAdminActionProxy(backendPath: string) {
                 body: raw || 'invalid or empty JSON body',
               },
             },
-            { status: res.status, headers: responseHeaders }
+            { status: res.status }
           );
         }
       }
@@ -76,7 +64,7 @@ export function createAdminActionProxy(backendPath: string) {
             body: raw || 'empty response body',
           },
         },
-        { status: res.status, headers: responseHeaders }
+        { status: res.status }
       );
     } catch (err) {
       return NextResponse.json(
