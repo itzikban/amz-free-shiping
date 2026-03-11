@@ -13,6 +13,8 @@ LOG_PATH = os.path.join(REPO_DIR, ".coderabbit-watch.log")
 REVIEW_RESPONSE_WAIT_SECONDS = 120
 ESCALATION_SECONDS = 300
 SAME_ACTIONABLE_LIMIT = 2
+UI_BASE_URL = os.environ.get("UI_BASE_URL", "http://20.240.201.161:8002")
+UI_ADMIN_URL = os.environ.get("UI_ADMIN_URL", f"{UI_BASE_URL}/admin")
 
 
 def run(cmd):
@@ -233,6 +235,9 @@ def main():
             prev["stale_alerted"] = False
             if actionable == 0 and (actionable_changed or activity_changed or sha_changed):
                 log(f"MERGE-READY PR #{num}: actionable=0 and ready for user merge decision.")
+                log(
+                    f"REMINDER PR #{num}: build/restart services and share UI links -> {UI_BASE_URL} and {UI_ADMIN_URL}"
+                )
                 any_event = True
 
         prev.update({
