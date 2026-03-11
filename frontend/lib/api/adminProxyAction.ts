@@ -38,18 +38,19 @@ export function createAdminActionProxy(backendPath: string) {
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase();
       if (contentType.includes('application/json')) {
+        const raw = await res.text();
         try {
-          return NextResponse.json(await res.json(), { status: res.status });
+          return NextResponse.json(raw ? JSON.parse(raw) : null, { status: res.status, headers: res.headers });
         } catch {
           return NextResponse.json(
             {
               error: 'backend_unexpected_response',
               detail: {
                 contentType: contentType || 'unknown',
-                body: 'invalid or empty JSON body',
+                body: raw || 'invalid or empty JSON body',
               },
             },
-            { status: res.status }
+            { status: res.status, headers: res.headers }
           );
         }
       }
