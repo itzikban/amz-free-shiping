@@ -1,10 +1,13 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
+	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
 	"free-ship-checker-go/internal/monitor"
 	"free-ship-checker-go/internal/userpanel"
@@ -15,6 +18,7 @@ func NewRouter() http.Handler {
 	svc := checker.New()
 	msvc := monitor.New(svc)
 	usvc := userpanel.New(svc)
+	asvc := admin.NewService(msvc, usvc)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -151,6 +155,49 @@ func NewRouter() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"alerts": usvc.ListAlerts()})
 	})
 
+	mux.HandleFunc("/v1/admin/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		writeJSON(w, http.StatusOK, asvc.Snapshot())
+	})
+
+	mux.HandleFunc("/v1/admin/actions/replay-failed-jobs", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		resp := admin.ReplayFailedJobs()
+		status := http.StatusOK
+		if !resp.OK {
+			status = http.StatusNotImplemented
+		}
+		writeJSON(w, status, resp)
+	})
+
+	mux.HandleFunc("/v1/admin/actions/retry-failed-notifications", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		resp := admin.RetryFailedNotifications()
+		status := http.StatusOK
+		if !resp.OK {
+			status = http.StatusNotImplemented
+		}
+		writeJSON(w, status, resp)
+	})
+
 	return mux
 }
 
@@ -165,4 +212,22 @@ func methodNotAllowed(w http.ResponseWriter, allowed ...string) {
 		w.Header().Set("Allow", strings.Join(allowed, ", "))
 	}
 	writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+}
+
+func requireAdmin(r *http.Request, w http.ResponseWriter) bool {
+	adminToken := strings.TrimSpace(os.Getenv("ADMIN_API_TOKEN"))
+	if adminToken == "" {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "admin access is disabled"})
+		return false
+	}
+	provided := strings.TrimSpace(r.Header.Get("X-Admin-Token"))
+	if provided == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing admin credentials"})
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(adminToken)) != 1 {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
+		return false
+	}
+	return true
 }
