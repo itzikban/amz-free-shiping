@@ -42,7 +42,7 @@ export function createAdminActionProxy(backendPath: string) {
           error: 'backend_unexpected_response',
           detail: {
             contentType: contentType || 'unknown',
-            body: raw ? raw.slice(0, 200) : 'empty response body',
+            body: raw || 'empty response body',
           },
         },
         { status: 502 }
