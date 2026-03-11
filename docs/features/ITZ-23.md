@@ -1,5 +1,7 @@
 # ITZ-23 User management UI (v1 local user)
 
+Status: Closed ✅
+
 ## Scope implemented
 - Local seeded user abstraction (`test-user`) via user panel backend service.
 - First user flow: add product to track.

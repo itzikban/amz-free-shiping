@@ -1,5 +1,7 @@
 # ITZ-9 Enqueue due tracking checks (scheduler)
 
+Status: Closed ✅
+
 ## Scope
 Implement scheduler logic that finds due items and enqueues check jobs while updating next-check atomically (interface-level in MVP).
 

@@ -1,5 +1,7 @@
 # ITZ-7 Create PostgreSQL schema + migrations
 
+Status: Closed ✅
+
 ## Scope
 Implement the initial relational schema required for tracking, snapshots, alerts, and outbox delivery.
 
