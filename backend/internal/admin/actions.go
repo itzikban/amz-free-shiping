@@ -7,9 +7,11 @@ type ActionResult struct {
 }
 
 func ReplayFailedJobs() ActionResult {
-	return ActionResult{OK: true, Action: "replay_failed_jobs", Message: "Replay accepted (stub for next chunk)"}
+	// TODO: Integrate with worker dispatch once the jobs replay pipeline is implemented.
+	return ActionResult{OK: false, Action: "replay_failed_jobs", Message: "Not implemented: worker integration required"}
 }
 
 func RetryFailedNotifications() ActionResult {
-	return ActionResult{OK: true, Action: "retry_failed_notifications", Message: "Retry accepted (stub for next chunk)"}
+	// TODO: Integrate with worker dispatch once the notification retry pipeline is implemented.
+	return ActionResult{OK: false, Action: "retry_failed_notifications", Message: "Not implemented: worker integration required"}
 }

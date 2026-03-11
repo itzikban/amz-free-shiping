@@ -24,7 +24,9 @@ export default function AdminPage() {
       const res = await fetch('/api/v1/admin/metrics');
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setMsg(body?.error || 'Failed to load metrics');
+        if (seq === reqSeq.current) {
+          setMsg(body?.error || 'Failed to load metrics');
+        }
         return;
       }
       const data = await res.json();
@@ -32,7 +34,9 @@ export default function AdminPage() {
         setMetrics(data);
       }
     } catch {
-      setMsg('Network error while loading metrics');
+      if (seq === reqSeq.current) {
+        setMsg('Network error while loading metrics');
+      }
     }
   }
 
@@ -40,16 +44,17 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const res = await fetch(path, { method: 'POST' });
-      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(body?.error || 'Action failed');
+        const fallback = await res.text().catch(() => '');
+        setMsg(`Action failed (${res.status})${fallback ? `: ${fallback.slice(0, 160)}` : ''}`);
         return;
       }
-      setMsg(body?.message || 'Action completed');
-      await refresh();
+      const body = await res.json().catch(() => ({}));
+      setMsg(body?.message || body?.error || 'Action completed');
     } catch {
-      setMsg('Network error while running action');
+      setMsg('Network or parse error while running action');
     } finally {
+      await refresh();
       setLoading(false);
     }
   }

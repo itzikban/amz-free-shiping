@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"free-ship-checker-go/internal/admin"
@@ -154,6 +155,9 @@ func NewRouter() http.Handler {
 	})
 
 	mux.HandleFunc("/v1/admin/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
 		if r.Method != http.MethodGet {
 			methodNotAllowed(w, http.MethodGet)
 			return
@@ -162,6 +166,9 @@ func NewRouter() http.Handler {
 	})
 
 	mux.HandleFunc("/v1/admin/actions/replay-failed-jobs", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
 		if r.Method != http.MethodPost {
 			methodNotAllowed(w, http.MethodPost)
 			return
@@ -170,6 +177,9 @@ func NewRouter() http.Handler {
 	})
 
 	mux.HandleFunc("/v1/admin/actions/retry-failed-notifications", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
 		if r.Method != http.MethodPost {
 			methodNotAllowed(w, http.MethodPost)
 			return
@@ -191,4 +201,22 @@ func methodNotAllowed(w http.ResponseWriter, allowed ...string) {
 		w.Header().Set("Allow", strings.Join(allowed, ", "))
 	}
 	writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+}
+
+func requireAdmin(r *http.Request, w http.ResponseWriter) bool {
+	adminToken := strings.TrimSpace(os.Getenv("ADMIN_API_TOKEN"))
+	if adminToken == "" {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "admin access is disabled"})
+		return false
+	}
+	provided := strings.TrimSpace(r.Header.Get("X-Admin-Token"))
+	if provided == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing admin credentials"})
+		return false
+	}
+	if provided != adminToken {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
+		return false
+	}
+	return true
 }
