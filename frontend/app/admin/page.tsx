@@ -20,6 +20,7 @@ export default function AdminPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginMsg, setLoginMsg] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const reqSeq = useRef(0);
 
@@ -53,6 +54,7 @@ export default function AdminPage() {
 
   async function login() {
     setLoginMsg('');
+    setLoggingIn(true);
     try {
       const res = await fetch('/api/v1/admin/login', {
         method: 'POST',
@@ -68,6 +70,8 @@ export default function AdminPage() {
       await refresh();
     } catch (err) {
       setLoginMsg(err instanceof Error ? err.message : 'network_error');
+    } finally {
+      setLoggingIn(false);
     }
   }
 
@@ -115,7 +119,7 @@ export default function AdminPage() {
           <div className="row" style={{ marginBottom: 12 }}>
             <input aria-label="Admin username" placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
             <input aria-label="Admin password" placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button className="secondary" onClick={login}>Login</button>
+            <button className="secondary" onClick={login} disabled={loggingIn}>{loggingIn ? 'Logging in...' : 'Login'}</button>
             {loginMsg && <span className="mutedText">{loginMsg}</span>}
           </div>
         )}
