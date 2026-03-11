@@ -3,6 +3,7 @@ import { fetchWithTimeout } from "@/lib/api/fetchWithTimeout";
 import { getBackendAdminHeaders, isAuthorized } from "@/lib/api/adminAuth";
 
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
+const ADMIN_ACTION_TIMEOUT_MS = 30_000;
 
 export function createAdminActionProxy(backendPath: string) {
   return async function POST(req: Request) {
@@ -21,11 +22,15 @@ export function createAdminActionProxy(backendPath: string) {
     }
 
     try {
-      const res = await fetchWithTimeout(new URL(backendPath, BACKEND_BASE_URL), {
-        method: 'POST',
-        cache: 'no-store',
-        headers,
-      });
+      const res = await fetchWithTimeout(
+        new URL(backendPath, BACKEND_BASE_URL),
+        {
+          method: 'POST',
+          cache: 'no-store',
+          headers,
+        },
+        ADMIN_ACTION_TIMEOUT_MS
+      );
 
       if (res.status === 204) {
         return new NextResponse(null, { status: 204 });
@@ -33,7 +38,20 @@ export function createAdminActionProxy(backendPath: string) {
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase();
       if (contentType.includes('application/json')) {
-        return NextResponse.json(await res.json(), { status: res.status });
+        try {
+          return NextResponse.json(await res.json(), { status: res.status });
+        } catch {
+          return NextResponse.json(
+            {
+              error: 'backend_unexpected_response',
+              detail: {
+                contentType: contentType || 'unknown',
+                body: 'invalid or empty JSON body',
+              },
+            },
+            { status: res.status }
+          );
+        }
       }
 
       const raw = await res.text();
