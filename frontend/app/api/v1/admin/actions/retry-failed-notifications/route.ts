@@ -9,15 +9,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
+  let headers: HeadersInit;
+  try {
+    headers = getBackendAdminHeaders();
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'misconfigured_admin_token', detail: err instanceof Error ? err.message : 'unknown' },
+      { status: 422 }
+    );
+  }
+
   try {
     const res = await fetchWithTimeout(new URL('/v1/admin/actions/retry-failed-notifications', BACKEND_BASE_URL), {
       method: 'POST',
       cache: 'no-store',
-      headers: getBackendAdminHeaders(),
+      headers,
     });
 
     if (res.status === 204) {
-      return NextResponse.json({}, { status: 204 });
+      return new NextResponse(null, { status: 204 });
     }
 
     const contentType = (res.headers.get('content-type') || '').toLowerCase();

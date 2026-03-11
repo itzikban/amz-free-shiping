@@ -4,17 +4,12 @@ function hasNonEmptyToken(token: string | undefined): token is string {
   return typeof token === 'string' && token.trim().length > 0;
 }
 
-function isSameOrigin(req: Request): boolean {
-  return req.headers.get('sec-fetch-site') === 'same-origin';
-}
-
 function hasValidAdminHeader(req: Request): boolean {
   if (!hasNonEmptyToken(ADMIN_API_TOKEN)) return false;
   return req.headers.get('x-admin-token') === ADMIN_API_TOKEN;
 }
 
 export function isAuthorized(req: Request): boolean {
-  if (isSameOrigin(req)) return true;
   return hasValidAdminHeader(req);
 }
 

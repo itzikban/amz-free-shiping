@@ -9,10 +9,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
+  let headers: HeadersInit;
+  try {
+    headers = getBackendAdminHeaders();
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'misconfigured_admin_token', detail: err instanceof Error ? err.message : 'unknown' },
+      { status: 422 }
+    );
+  }
+
   try {
     const res = await fetchWithTimeout(new URL('/v1/admin/metrics', BACKEND_BASE_URL), {
       cache: 'no-store',
-      headers: getBackendAdminHeaders(),
+      headers,
     });
 
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
