@@ -19,6 +19,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
   const [submittedForm, setSubmittedForm] = useState<FormState | null>(null);
+  const [addingWatchlist, setAddingWatchlist] = useState(false);
+  const [watchlistAdded, setWatchlistAdded] = useState(false);
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -40,6 +42,7 @@ export default function HomePage() {
     setError(null);
     setResult(null);
     setSubmittedForm(null);
+    setWatchlistAdded(false);
 
     try {
       const params = new URLSearchParams({ url: submitted.url, country: submitted.country });
@@ -57,7 +60,9 @@ export default function HomePage() {
   }
 
   async function addToWatchlist() {
-    if (!submittedForm) return;
+    if (!submittedForm || addingWatchlist) return;
+    setAddingWatchlist(true);
+    setWatchlistAdded(false);
     try {
       const res = await fetch("/api/v1/me/tracked-items", {
         method: "POST",
@@ -72,8 +77,12 @@ export default function HomePage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error || t("err_add_watchlist"));
       }
+      setWatchlistAdded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("err_network"));
+      setWatchlistAdded(false);
+    } finally {
+      setAddingWatchlist(false);
     }
   }
 
@@ -160,10 +169,11 @@ export default function HomePage() {
             )}
             {result && submittedForm && (
               <div className="targetActions">
-                <button className="secondary" type="button" onClick={addToWatchlist}>{t("add_button")}</button>
-                <button className="btn-alert-pulse" type="button" disabled aria-disabled="true" title={t("home_alert_cta_disabled")}>
-                  {t("home_alert_cta_disabled")}
+                <button className="secondary" type="button" onClick={addToWatchlist} disabled={addingWatchlist || watchlistAdded}>
+                  {addingWatchlist ? t("loading") : watchlistAdded ? t("watchlist_added") : t("add_button")}
                 </button>
+                <span className="signalPill neutral btn-alert-pulse" role="status" aria-live="polite">{t("home_coming_soon_short")}</span>
+                <span className="mutedText">{t("home_alert_cta_disabled")}</span>
               </div>
             )}
           </div>
