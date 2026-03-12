@@ -44,6 +44,12 @@ func New() *Service {
 }
 
 func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Result, error) {
+	// 1. Try Decodo API first (preferred method)
+	if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
+		return dres, nil
+	}
+
+	// 2. Fallback: plain HTTP fetch
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return Result{}, err
@@ -66,13 +72,11 @@ func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Resul
 	}
 	res := AnalyzeHTML(url, country, string(body))
 	res.Method = "http"
-	if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
-		return dres, nil
-	}
 	if res.FreeShippingCountry {
 		return res, nil
 	}
 
+	// 3. Fallback: headless browser
 	browserRes, berr := s.browserAnalyze(ctx, url, country, zip)
 	if berr == nil {
 		return browserRes, nil

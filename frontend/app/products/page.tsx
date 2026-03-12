@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
+import { useI18n } from "@/lib/i18n";
 
 export default function ProductsPage() {
+  const { t, formatDate } = useI18n();
   const [items, setItems] = useState<TrackedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -34,44 +37,80 @@ export default function ProductsPage() {
     };
   }, []);
 
-  const counts = useMemo(() => ({
-    free: items.filter((x) => x.free_shipping_country).length,
-    notFree: items.filter((x) => !x.free_shipping_country).length,
-  }), [items]);
+  const counts = useMemo(
+    () => ({
+      total: items.length,
+      free: items.filter((x) => x.free_shipping_country).length,
+      notFree: items.filter((x) => !x.free_shipping_country).length,
+    }),
+    [items]
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((it) => it.url.toLowerCase().includes(q) || it.country.toLowerCase().includes(q));
+  }, [items, query]);
 
   return (
     <main className="container">
       <section className="card hero">
-        <h1>Watchlist</h1>
-        <p>Tracked products with destination-specific shipping verdict.</p>
-        <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <div className="card"><strong>{items.length}</strong><br /><small>Total tracked</small></div>
-          <div className="card"><strong>{counts.free}</strong><br /><small>Free shipping</small></div>
-          <div className="card"><strong>{counts.notFree}</strong><br /><small>Not free</small></div>
+        <h1>{t("watchlist_title")}</h1>
+        <p>{t("products_subtitle")}</p>
+
+        <div className="statGrid">
+          <div className="kpiCard">
+            <span>{t("products_total_tracked")}</span>
+            <strong>{counts.total}</strong>
+          </div>
+          <div className="kpiCard ok">
+            <span>{t("products_free_shipping")}</span>
+            <strong>{counts.free}</strong>
+          </div>
+          <div className="kpiCard no">
+            <span>{t("products_not_free")}</span>
+            <strong>{counts.notFree}</strong>
+          </div>
         </div>
-        {usingFallback && <p className="hint">Backend unavailable — showing local fallback sample data.</p>}
+
+        {usingFallback && <p className="hint">{t("products_fallback_notice")}</p>}
       </section>
 
       <section className="card">
-        <div className="row actionsRow">
-          <h3>Tracked products</h3>
-          <Link href="/">+ Add from checker</Link>
+        <div className="actionsRow">
+          <h3>{t("products_heading")}</h3>
+          <Link href="/">{t("products_add_from_checker")}</Link>
         </div>
 
-        {loading ? <p>Loading…</p> : (
-          <ul>
-            {items.length === 0 && <li>No tracked products yet.</li>}
-            {items.map((it) => (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("products_search_placeholder")}
+          style={{ marginBottom: 12 }}
+        />
+
+        {loading ? (
+          <p>{t("loading")}</p>
+        ) : (
+          <ul className="listClean">
+            {filtered.length === 0 && <li>{query.trim() ? t("products_no_results") : t("products_empty")}</li>}
+            {filtered.map((it) => (
               <li key={it.id} className="monitorItem">
                 <div>
-                  <strong>{it.country}</strong> · {it.free_shipping_country ? "✅ Free" : "❌ Not free"}
-                  <br />
+                  <div className="chipRow">
+                    <span className={`signalPill ${it.free_shipping_country ? "ok" : "no"}`}>
+                      {it.free_shipping_country ? t("products_status_free") : t("products_status_not_free")}
+                    </span>
+                    <span className="signalPill neutral">{it.country}</span>
+                  </div>
                   <small>{it.url}</small>
                   <br />
-                  <small>Last checked: {new Date(it.last_checked_at).toLocaleString()}</small>
+                  <small>
+                    {t("products_last_checked")} {formatDate(it.last_checked_at)}
+                  </small>
                 </div>
                 <div>
-                  <Link href={`/products/${encodeURIComponent(it.id)}`}>View details</Link>
+                  <Link href={`/products/${encodeURIComponent(it.id)}`}>{t("products_view_details")}</Link>
                 </div>
               </li>
             ))}
