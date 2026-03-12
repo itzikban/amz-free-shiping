@@ -18,6 +18,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
+  const [submittedForm, setSubmittedForm] = useState<FormState | null>(null);
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -29,17 +30,25 @@ export default function HomePage() {
     e.preventDefault();
     if (!canSubmit) return;
 
+    const submitted: FormState = {
+      url: form.url.trim(),
+      country: form.country,
+      zip: form.zip.trim(),
+    };
+
     setLoading(true);
     setError(null);
     setResult(null);
+    setSubmittedForm(null);
 
     try {
-      const params = new URLSearchParams({ url: form.url, country: form.country });
-      if (form.country === "US" && form.zip.trim()) params.set("zip", form.zip.trim());
+      const params = new URLSearchParams({ url: submitted.url, country: submitted.country });
+      if (submitted.country === "US" && submitted.zip) params.set("zip", submitted.zip);
       const res = await fetch(`/api/check?${params.toString()}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");
       setResult(body);
+      setSubmittedForm(submitted);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -48,15 +57,15 @@ export default function HomePage() {
   }
 
   async function addToWatchlist() {
-    if (!canSubmit) return;
+    if (!submittedForm) return;
     try {
       const res = await fetch("/api/v1/me/tracked-items", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          url: form.url,
-          country: form.country,
-          zip: form.country === "US" ? form.zip.trim() : "",
+          url: submittedForm.url,
+          country: submittedForm.country,
+          zip: submittedForm.country === "US" ? submittedForm.zip : "",
         }),
       });
       if (!res.ok) {
@@ -82,7 +91,9 @@ export default function HomePage() {
 
         <form className="search-container" onSubmit={onSubmit}>
           <div className="search-row grow">
+            <label className="sr-only" htmlFor="product-url">{t("product_url")}</label>
             <input
+              id="product-url"
               className="clean-input"
               type="url"
               value={form.url}
@@ -93,7 +104,9 @@ export default function HomePage() {
           </div>
 
           <div className="search-row fixed">
+            <label className="sr-only" htmlFor="destination-country">{t("destination_country")}</label>
             <select
+              id="destination-country"
               className="clean-input"
               value={form.country}
               onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" }))}
@@ -105,7 +118,9 @@ export default function HomePage() {
 
           {form.country === "US" && (
             <div className="search-row fixed">
+              <label className="sr-only" htmlFor="destination-zip">{t("zip_us")}</label>
               <input
+                id="destination-zip"
                 className="clean-input"
                 type="text"
                 value={form.zip}
@@ -143,12 +158,14 @@ export default function HomePage() {
                 </div>
               </>
             )}
-            <div className="targetActions">
-              <button className="secondary" type="button" onClick={addToWatchlist}>{t("add_button")}</button>
-              <button className="btn-alert-pulse" type="button" disabled aria-disabled="true" title={t("home_alert_cta_disabled")}>
-                {t("home_alert_cta_disabled")}
-              </button>
-            </div>
+            {result && submittedForm && (
+              <div className="targetActions">
+                <button className="secondary" type="button" onClick={addToWatchlist}>{t("add_button")}</button>
+                <button className="btn-alert-pulse" type="button" disabled aria-disabled="true" title={t("home_alert_cta_disabled")}>
+                  {t("home_alert_cta_disabled")}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
