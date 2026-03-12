@@ -155,6 +155,61 @@ func NewRouter() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"alerts": usvc.ListAlerts()})
 	})
 
+	mux.HandleFunc("/v1/me/notifications", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		unreadOnly := strings.EqualFold(r.URL.Query().Get("unread"), "true")
+		writeJSON(w, http.StatusOK, map[string]any{"notifications": usvc.ListNotifications(unreadOnly, 100)})
+	})
+
+	mux.HandleFunc("/v1/me/notifications/read", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		var req struct {
+			ID  string `json:"id"`
+			All bool   `json:"all"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+			return
+		}
+		if req.All {
+			count := usvc.MarkAllNotificationsRead()
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": count})
+			return
+		}
+		if req.ID == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "id or all=true is required"})
+			return
+		}
+		if !usvc.MarkNotificationRead(req.ID) {
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "notification not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	})
+
+	mux.HandleFunc("/v1/me/notification-preferences", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			writeJSON(w, http.StatusOK, usvc.NotificationPreferences())
+			return
+		}
+		if r.Method == http.MethodPut {
+			var req userpanel.NotificationPreferences
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+				return
+			}
+			writeJSON(w, http.StatusOK, usvc.UpdateNotificationPreferences(req))
+			return
+		}
+		methodNotAllowed(w, http.MethodGet, http.MethodPut)
+	})
+
 	mux.HandleFunc("/v1/admin/metrics", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAdmin(r, w) {
 			return
@@ -190,12 +245,12 @@ func NewRouter() http.Handler {
 			methodNotAllowed(w, http.MethodPost)
 			return
 		}
-		resp := admin.RetryFailedNotifications()
-		status := http.StatusOK
-		if !resp.OK {
-			status = http.StatusNotImplemented
+		processed, err := usvc.RetryFailedNotifications(r.Context(), 100)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "action": "retry_failed_notifications", "error": err.Error()})
+			return
 		}
-		writeJSON(w, status, resp)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "action": "retry_failed_notifications", "processed": processed})
 	})
 
 	return mux

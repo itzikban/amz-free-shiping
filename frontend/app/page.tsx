@@ -46,6 +46,8 @@ type UserTrackedItem = {
   signal: string;
 };
 type UserAlert = { id: string; message: string; created_at: string };
+type InAppNotification = { id: string; title: string; message: string; read: boolean; created_at: string; read_at?: string };
+type NotificationPreferences = { in_app_enabled: boolean; on_item_added: boolean };
 
 const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
 
@@ -62,6 +64,8 @@ export default function HomePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [userItems, setUserItems] = useState<UserTrackedItem[]>([]);
   const [userAlerts, setUserAlerts] = useState<UserAlert[]>([]);
+  const [inAppNotifications, setInAppNotifications] = useState<InAppNotification[]>([]);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({ in_app_enabled: true, on_item_added: true });
   const refreshSeqRef = useRef(0);
 
   const canSubmit = useMemo(() => {
@@ -96,10 +100,12 @@ export default function HomePage() {
 
   async function refreshUserPanel() {
     const seq = ++refreshSeqRef.current;
-    const [meRes, itemsRes, alertsRes] = await Promise.allSettled([
+    const [meRes, itemsRes, alertsRes, notificationsRes, prefsRes] = await Promise.allSettled([
       fetch('/api/v1/me'),
       fetch('/api/v1/me/tracked-items'),
       fetch('/api/v1/me/alerts'),
+      fetch('/api/v1/me/notifications'),
+      fetch('/api/v1/me/notification-preferences'),
     ]);
 
     if (seq !== refreshSeqRef.current) return;
@@ -115,6 +121,20 @@ export default function HomePage() {
     if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
       const b = await alertsRes.value.json();
       if (seq === refreshSeqRef.current) setUserAlerts(b.alerts || []);
+    }
+
+    if (notificationsRes.status === 'fulfilled' && notificationsRes.value.ok) {
+      const b = await notificationsRes.value.json();
+      if (seq === refreshSeqRef.current) setInAppNotifications(b.notifications || []);
+    }
+    if (prefsRes.status === 'fulfilled' && prefsRes.value.ok) {
+      const b = await prefsRes.value.json();
+      if (seq === refreshSeqRef.current) {
+        setNotificationPrefs({
+          in_app_enabled: Boolean(b?.in_app_enabled),
+          on_item_added: Boolean(b?.on_item_added),
+        });
+      }
     }
   }
 
@@ -249,6 +269,37 @@ export default function HomePage() {
       await refreshMonitorData();
     } catch {
       setError("Network error while resetting notifications");
+    }
+  }
+
+
+  async function markNotificationRead(id: string) {
+    const res = await fetch('/api/v1/me/notifications/read', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) await refreshUserPanel();
+  }
+
+  async function markAllNotificationsRead() {
+    const res = await fetch('/api/v1/me/notifications/read', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    });
+    if (res.ok) await refreshUserPanel();
+  }
+
+  async function saveNotificationPrefs(next: NotificationPreferences) {
+    const res = await fetch('/api/v1/me/notification-preferences', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(next),
+    });
+    if (res.ok) {
+      setNotificationPrefs(next);
+      await refreshUserPanel();
     }
   }
 
@@ -408,6 +459,51 @@ export default function HomePage() {
               {userAlerts.length === 0 && <li>No user alerts yet.</li>}
               {userAlerts.slice(0, 8).map((a) => (
                 <li key={a.id}>🔔 {new Date(a.created_at).toLocaleTimeString()} · {a.message}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+
+      <section className="card">
+        <div className="row actionsRow">
+          <h3>In-app notifications center</h3>
+          <button className="secondary" onClick={markAllNotificationsRead}>Mark all read</button>
+        </div>
+        <div className="row split">
+          <div>
+            <h4>Preferences</h4>
+            <label>
+              <input
+                type="checkbox"
+                checked={notificationPrefs.in_app_enabled}
+                onChange={(e) => saveNotificationPrefs({ ...notificationPrefs, in_app_enabled: e.target.checked })}
+              /> Enable in-app notifications
+            </label>
+            <br />
+            <label>
+              <input
+                type="checkbox"
+                checked={notificationPrefs.on_item_added}
+                disabled={!notificationPrefs.in_app_enabled}
+                onChange={(e) => saveNotificationPrefs({ ...notificationPrefs, on_item_added: e.target.checked })}
+              /> Notify when tracked item is added
+            </label>
+          </div>
+          <div>
+            <h4>Inbox ({inAppNotifications.filter((n) => !n.read).length} unread)</h4>
+            <ul>
+              {inAppNotifications.length === 0 && <li>No notifications yet.</li>}
+              {inAppNotifications.slice(0, 10).map((n) => (
+                <li key={n.id}>
+                  {n.read ? '✅' : '🟡'} {new Date(n.created_at).toLocaleTimeString()} · <strong>{n.title}</strong> — {n.message}
+                  {!n.read && (
+                    <button className="secondary" onClick={() => markNotificationRead(n.id)} style={{ marginLeft: 8 }}>
+                      mark read
+                    </button>
+                  )}
+                </li>
               ))}
             </ul>
           </div>
