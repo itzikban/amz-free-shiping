@@ -93,7 +93,12 @@ func (s *Service) ListNotifications(unreadOnly bool, limit int) []Notification {
 		if unreadOnly && n.Read {
 			continue
 		}
-		out = append(out, n)
+		copied := n
+		if n.ReadAt != nil {
+			t := *n.ReadAt
+			copied.ReadAt = &t
+		}
+		out = append(out, copied)
 		if len(out) >= limit {
 			break
 		}
@@ -143,6 +148,13 @@ func (s *Service) MarkAllNotificationsRead() int {
 }
 
 func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (TrackedItem, error) {
+	raw := strings.TrimSpace(req.URL)
+	if asin := strings.ToUpper(raw); isASIN(asin) {
+		req.URL = "https://www.amazon.com/dp/" + asin
+	} else {
+		req.URL = raw
+	}
+
 	res, err := s.checker.CheckURL(ctx, req.URL, req.Country, req.ZIP)
 	if err != nil {
 		return TrackedItem{}, err
@@ -230,9 +242,21 @@ func (s *Service) UserCounts() admin.UserStats {
 	return admin.UserStats{TrackedItems: len(s.items), Alerts: len(s.alerts)}
 }
 
+func isASIN(s string) bool {
+	if len(s) != 10 {
+		return false
+	}
+	for _, r := range s {
+		if (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 func normalizeASIN(in string) string {
 	u := strings.ToUpper(strings.TrimSpace(in))
-	if len(u) == 10 && strings.HasPrefix(u, "B0") {
+	if isASIN(u) {
 		return u
 	}
 	for _, m := range []string{"/DP/", "/GP/PRODUCT/", "ASIN="} {
@@ -240,7 +264,7 @@ func normalizeASIN(in string) string {
 			start := idx + len(m)
 			if start+10 <= len(u) {
 				c := u[start : start+10]
-				if strings.HasPrefix(c, "B0") {
+				if isASIN(c) {
 					return c
 				}
 			}
@@ -248,7 +272,7 @@ func normalizeASIN(in string) string {
 	}
 	if parsed, err := url.Parse(in); err == nil {
 		q := strings.ToUpper(parsed.Query().Get("asin"))
-		if len(q) == 10 && strings.HasPrefix(q, "B0") {
+		if isASIN(q) {
 			return q
 		}
 	}
@@ -273,7 +297,7 @@ func canonicalProductKey(canonicalURL, asin string) string {
 	return "url:" + hex.EncodeToString(sum[:])
 }
 func dedupScopeKey(userID, canonicalKey, country, zip string) string {
-	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + strings.TrimSpace(zip) + "|" + canonicalKey
+	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + strings.ToUpper(strings.TrimSpace(zip)) + "|" + canonicalKey
 }
 func makeID(prefix string, n int) string {
 	return prefix + "-" + time.Now().UTC().Format("150405") + "-" + fmtInt(n)
