@@ -76,6 +76,11 @@ type AddTrackedItemReq struct {
 	ZIP     string `json:"zip"`
 }
 
+const (
+	maxNotificationIndexEntries = 2000
+	maxAlertMessageEntries      = 1000
+)
+
 type Service struct {
 	checker           *checker.Service
 	mu                sync.RWMutex
@@ -89,11 +94,13 @@ type Service struct {
 	itemByScope       map[string]int
 	outbox            *notify.Service
 	notificationIndex map[string]struct{}
+	notificationOrder []string
 	alertMessages     map[string]string
+	alertMessageOrder []string
 }
 
 func New(c *checker.Service) *Service {
-	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}, outbox: notify.New(notify.NewInMemorySender()), notificationIndex: map[string]struct{}{}, alertMessages: map[string]string{}}
+	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}, outbox: notify.New(notify.NewInMemorySender()), notificationIndex: map[string]struct{}{}, notificationOrder: []string{}, alertMessages: map[string]string{}, alertMessageOrder: []string{}}
 }
 func (s *Service) Me() User { return s.user }
 func (s *Service) ListItems() []TrackedItem {
@@ -255,7 +262,7 @@ func (s *Service) appendAlert(item TrackedItem, dedup bool, prevStrict bool, now
 		a.Type = "other"
 	}
 	s.alerts = append([]Alert{a}, s.alerts...)
-	s.alertMessages[a.ID] = a.Message
+	s.rememberAlertMessage(a.ID, a.Message)
 	if len(s.alerts) > 100 {
 		s.alerts = s.alerts[:100]
 	}
@@ -287,9 +294,7 @@ func (s *Service) syncDeliveredNotifications(now time.Time) {
 		s.notificationIndex = map[string]struct{}{}
 	}
 	for _, n := range s.notifications {
-		if n.AlertID != "" {
-			s.notificationIndex[n.AlertID] = struct{}{}
-		}
+		s.rememberNotificationIndex(n.AlertID)
 	}
 	for _, e := range entries {
 		if e.Status != notify.StatusDelivered || e.Channel != "in_app" {
@@ -309,20 +314,50 @@ func (s *Service) syncDeliveredNotifications(now time.Time) {
 		s.seq++
 		n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, AlertID: e.AlertID, Title: "Tracking updated", Message: msg, CreatedAt: now}
 		s.notifications = append([]Notification{n}, s.notifications...)
-		s.notificationIndex[e.AlertID] = struct{}{}
+		s.rememberNotificationIndex(e.AlertID)
 		if len(s.notifications) > 200 {
 			s.notifications = s.notifications[:200]
 		}
 	}
 }
 
-func (s *Service) hasNotificationForAlert(alertID string) bool {
+func (s *Service) rememberNotificationIndex(alertID string) {
 	if alertID == "" {
-		return false
+		return
 	}
-	_, ok := s.notificationIndex[alertID]
-	return ok
+	if s.notificationIndex == nil {
+		s.notificationIndex = map[string]struct{}{}
+	}
+	if _, exists := s.notificationIndex[alertID]; exists {
+		return
+	}
+	s.notificationIndex[alertID] = struct{}{}
+	s.notificationOrder = append(s.notificationOrder, alertID)
+	for len(s.notificationOrder) > maxNotificationIndexEntries {
+		drop := s.notificationOrder[0]
+		s.notificationOrder = s.notificationOrder[1:]
+		delete(s.notificationIndex, drop)
+	}
 }
+
+func (s *Service) rememberAlertMessage(alertID, message string) {
+	if alertID == "" {
+		return
+	}
+	if s.alertMessages == nil {
+		s.alertMessages = map[string]string{}
+	}
+	if _, exists := s.alertMessages[alertID]; !exists {
+		s.alertMessageOrder = append(s.alertMessageOrder, alertID)
+	}
+	s.alertMessages[alertID] = message
+	for len(s.alertMessageOrder) > maxAlertMessageEntries {
+		drop := s.alertMessageOrder[0]
+		s.alertMessageOrder = s.alertMessageOrder[1:]
+		delete(s.alertMessages, drop)
+	}
+}
+
 func (s *Service) UserCounts() admin.UserStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
