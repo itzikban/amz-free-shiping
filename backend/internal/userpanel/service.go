@@ -191,7 +191,9 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 	}
 	item, alert, queueNotification := s.addTrackedItemFromResult(req, res)
 	if queueNotification {
-		_, _ = s.outbox.DispatchDue(ctx, time.Now().UTC(), 25)
+		if _, err := s.outbox.DispatchDue(ctx, time.Now().UTC(), 25); err != nil {
+			return item, err
+		}
 		for _, entry := range s.outbox.Entries() {
 			if entry.AlertID != alert.ID || entry.Status != notify.StatusDelivered {
 				continue
@@ -210,6 +212,99 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 	return item, nil
 }
 
+func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Result) (TrackedItem, Alert, bool) {
+	now := time.Now().UTC()
+	asin := normalizeASIN(req.URL)
+	canonicalURL := canonicalProductURL(req.URL, asin)
+	canonicalKey := canonicalProductKey(canonicalURL, asin)
+	scopeKey := dedupScopeKey(s.user.ID, canonicalKey, req.Country, req.ZIP)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	product, ok := s.productsByKey[canonicalKey]
+	if !ok {
+		s.seq++
+		product = Product{ID: makeID("prod", s.seq), ASIN: asin, CanonicalURL: canonicalURL, CanonicalKey: canonicalKey, FirstSeenAt: now}
+	}
+	product.LastObservedAt = now
+	s.productsByKey[canonicalKey] = product
+
+	dedup := false
+	var item TrackedItem
+	if idx, exists := s.itemByScope[scopeKey]; exists && idx >= 0 && idx < len(s.items) {
+		dedup = true
+		item = s.items[idx]
+		item.LastCheckedAt = res.CheckedAt
+		item.LastPriceUSD = res.PriceUSD
+		item.FreeShipping = res.FreeShipping
+		item.FreeShippingStrict = res.FreeShippingCountry
+		item.Signal = res.Signal
+		item.Method = res.Method
+		item.URL = req.URL
+		item.ASIN = asin
+		item.CanonicalURL = canonicalURL
+		item.ProductID = product.ID
+		s.items[idx] = item
+	} else {
+		s.seq++
+		item = TrackedItem{
+			ID:                 makeID("item", s.seq),
+			UserID:             s.user.ID,
+			ProductID:          product.ID,
+			ASIN:               asin,
+			CanonicalURL:       canonicalURL,
+			URL:                req.URL,
+			Country:            req.Country,
+			ZIP:                req.ZIP,
+			CreatedAt:          now,
+			LastCheckedAt:      res.CheckedAt,
+			LastPriceUSD:       res.PriceUSD,
+			FreeShipping:       res.FreeShipping,
+			FreeShippingStrict: res.FreeShippingCountry,
+			Signal:             res.Signal,
+			Method:             res.Method,
+		}
+		s.items = append([]TrackedItem{item}, s.items...)
+		if len(s.items) > 100 {
+			s.items = s.items[:100]
+		}
+		s.rebuildItemIndex()
+	}
+
+	alert := s.appendAlert(item, dedup, now)
+	queueNotification := s.prefs.InAppEnabled && s.prefs.OnItemAdded
+	if queueNotification {
+		key := notify.BuildIdempotencyKey(alert.ID, "in_app", s.user.ID)
+		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, key, now)
+	}
+	return item, alert, queueNotification
+}
+
+func (s *Service) appendAlert(item TrackedItem, dedup bool, now time.Time) Alert {
+	s.seq++
+	a := Alert{ID: makeID("alert", s.seq), UserID: s.user.ID, CreatedAt: now}
+	if dedup {
+		a.Message = "♻️ Tracked item already exists (canonical dedup), refreshed latest check"
+	} else if item.FreeShippingStrict {
+		a.Message = "✅ Tracked item added: free shipping for destination"
+	} else {
+		a.Message = "ℹ️ Tracked item added: not free shipping for destination"
+	}
+	s.alerts = append([]Alert{a}, s.alerts...)
+	if len(s.alerts) > 100 {
+		s.alerts = s.alerts[:100]
+	}
+	return a
+}
+
+func (s *Service) rebuildItemIndex() {
+	s.itemByScope = map[string]int{}
+	for i := range s.items {
+		s.itemByScope[dedupScopeKey(s.items[i].UserID, canonicalProductKey(s.items[i].CanonicalURL, s.items[i].ASIN), s.items[i].Country, s.items[i].ZIP)] = i
+	}
+}
+
 func (s *Service) RetryFailedNotifications(ctx context.Context, limit int) (int, error) {
 	return s.outbox.DispatchDue(ctx, time.Now().UTC(), limit)
 }
@@ -218,6 +313,55 @@ func (s *Service) UserCounts() admin.UserStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return admin.UserStats{TrackedItems: len(s.items), Alerts: len(s.alerts)}
+}
+
+func normalizeASIN(in string) string {
+	u := strings.ToUpper(strings.TrimSpace(in))
+	if len(u) == 10 && strings.HasPrefix(u, "B0") {
+		return u
+	}
+	for _, m := range []string{"/DP/", "/GP/PRODUCT/", "ASIN="} {
+		if idx := strings.Index(u, m); idx >= 0 {
+			start := idx + len(m)
+			if start+10 <= len(u) {
+				candidate := u[start : start+10]
+				if strings.HasPrefix(candidate, "B0") {
+					return candidate
+				}
+			}
+		}
+	}
+	if parsed, err := url.Parse(in); err == nil {
+		q := strings.ToUpper(parsed.Query().Get("asin"))
+		if len(q) == 10 && strings.HasPrefix(q, "B0") {
+			return q
+		}
+	}
+	return ""
+}
+
+func canonicalProductURL(rawURL, asin string) string {
+	if asin != "" {
+		return "https://www.amazon.com/dp/" + asin
+	}
+	if u, err := url.Parse(rawURL); err == nil {
+		u.RawQuery = ""
+		u.Fragment = ""
+		return strings.TrimRight(u.String(), "/")
+	}
+	return strings.TrimRight(rawURL, "/")
+}
+
+func canonicalProductKey(canonicalURL, asin string) string {
+	if asin != "" {
+		return "asin:" + asin
+	}
+	sum := sha1.Sum([]byte(strings.ToLower(canonicalURL)))
+	return "url:" + hex.EncodeToString(sum[:])
+}
+
+func dedupScopeKey(userID, canonicalKey, country, zip string) string {
+	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + strings.TrimSpace(zip) + "|" + canonicalKey
 }
 
 func makeID(prefix string, n int) string {

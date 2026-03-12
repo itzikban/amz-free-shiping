@@ -12,8 +12,14 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  let body;
   try {
-    const body = await req.json();
+    body = await req.json();
+  } catch (err) {
+    return NextResponse.json({ error: 'invalid_json', detail: err instanceof Error ? err.message : 'unknown' }, { status: 400 });
+  }
+
+  try {
     const res = await fetchWithTimeout(new URL('/v1/me/notification-preferences', BACKEND_BASE_URL), {
       method: 'PUT',
       cache: 'no-store',
