@@ -11,7 +11,6 @@ import (
 
 func TestTransitionNotFreeToFree_CreatesTransitionAlertAndNotification(t *testing.T) {
 	svc := New(nil)
-	svc.outbox = notify.New(notify.NewInMemorySender())
 
 	req := AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "US", ZIP: "10013"}
 	notFree := checker.Result{CheckedAt: time.Now().UTC(), FreeShipping: false, FreeShippingCountry: false, Signal: "not_free", Method: "mock"}

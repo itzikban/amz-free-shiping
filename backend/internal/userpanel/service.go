@@ -101,7 +101,18 @@ type Service struct {
 }
 
 func New(c *checker.Service) *Service {
-	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}, outbox: notify.New(notify.NewInMemorySender()), notificationIndex: map[string]struct{}{}, notificationOrder: []string{}, alertMessages: map[string]string{}, alertMessageOrder: []string{}}
+	return &Service{
+		checker:           c,
+		user:              User{ID: "test-user", Name: "test-user"},
+		prefs:             NotificationPreferences{InAppEnabled: true, OnItemAdded: true},
+		productsByKey:     make(map[string]Product),
+		itemByScope:       make(map[string]int),
+		outbox:            notify.New(notify.NewInMemorySender()),
+		notificationIndex: make(map[string]struct{}),
+		notificationOrder: []string{},
+		alertMessages:     make(map[string]string),
+		alertMessageOrder: []string{},
+	}
 }
 func (s *Service) Me() User { return s.user }
 func (s *Service) ListItems() []TrackedItem {
