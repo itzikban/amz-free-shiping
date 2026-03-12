@@ -77,7 +77,8 @@ type AddTrackedItemReq struct {
 }
 
 const (
-	maxAlertMessageEntries = 1000
+	maxAlertMessageEntries      = 1000
+	maxNotificationIndexEntries = 2000
 )
 
 type Service struct {
@@ -339,6 +340,11 @@ func (s *Service) rememberNotificationIndex(alertID string) {
 	}
 	s.notificationIndex[alertID] = struct{}{}
 	s.notificationOrder = append(s.notificationOrder, alertID)
+	for len(s.notificationOrder) > maxNotificationIndexEntries {
+		drop := s.notificationOrder[0]
+		s.notificationOrder = s.notificationOrder[1:]
+		delete(s.notificationIndex, drop)
+	}
 }
 
 func (s *Service) rememberAlertMessage(alertID, message string) {
