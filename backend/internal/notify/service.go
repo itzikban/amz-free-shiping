@@ -67,6 +67,7 @@ func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (in
 		limit = len(s.entries)
 	}
 	processed := 0
+	var firstErr error
 	for i := range s.entries {
 		if processed >= limit {
 			break
@@ -76,6 +77,9 @@ func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (in
 		}
 		if err := s.sender.Send(ctx, s.entries[i]); err != nil {
 			s.entries[i].Status = StatusFailed
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 		t := now.UTC()
@@ -83,7 +87,7 @@ func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (in
 		s.entries[i].SentAt = &t
 		processed++
 	}
-	return processed, nil
+	return processed, firstErr
 }
 
 func (s *Service) Entries() []Entry {
