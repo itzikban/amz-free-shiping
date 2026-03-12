@@ -230,9 +230,21 @@ func (s *Service) UserCounts() admin.UserStats {
 	return admin.UserStats{TrackedItems: len(s.items), Alerts: len(s.alerts)}
 }
 
+func isASIN(s string) bool {
+	if len(s) != 10 {
+		return false
+	}
+	for _, r := range s {
+		if (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 func normalizeASIN(in string) string {
 	u := strings.ToUpper(strings.TrimSpace(in))
-	if len(u) == 10 && strings.HasPrefix(u, "B0") {
+	if isASIN(u) {
 		return u
 	}
 	for _, m := range []string{"/DP/", "/GP/PRODUCT/", "ASIN="} {
@@ -240,7 +252,7 @@ func normalizeASIN(in string) string {
 			start := idx + len(m)
 			if start+10 <= len(u) {
 				c := u[start : start+10]
-				if strings.HasPrefix(c, "B0") {
+				if isASIN(c) {
 					return c
 				}
 			}
@@ -248,7 +260,7 @@ func normalizeASIN(in string) string {
 	}
 	if parsed, err := url.Parse(in); err == nil {
 		q := strings.ToUpper(parsed.Query().Get("asin"))
-		if len(q) == 10 && strings.HasPrefix(q, "B0") {
+		if isASIN(q) {
 			return q
 		}
 	}
