@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getFallbackAlerts, UserAlert } from "@/lib/watchlist";
+import { useI18n } from "@/lib/i18n";
 
 export default function AlertsPage() {
+  const { t } = useI18n();
   const [alerts, setAlerts] = useState<UserAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "free" | "price">("all");
@@ -34,7 +36,7 @@ export default function AlertsPage() {
   return (
     <main className="container">
       <section className="card hero">
-        <h1>Alerts Center</h1>
+        <h1>{t("alerts_title")}</h1>
         <p>In-app alerts for shipping and price changes.</p>
         <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
           <button className={filter === "all" ? "" : "secondary"} onClick={() => setFilter("all")}>All</button>

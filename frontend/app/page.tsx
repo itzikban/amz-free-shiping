@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CheckResponse } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 
 type FormState = {
   url: string;
@@ -52,6 +53,7 @@ type NotificationPreferences = { in_app_enabled: boolean; on_item_added: boolean
 const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
 
 export default function HomePage() {
+  const { t } = useI18n();
   const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "US", zip: "10013" });
   const [intervalSec, setIntervalSec] = useState(20);
   const [loading, setLoading] = useState(false);
@@ -333,11 +335,8 @@ export default function HomePage() {
   return (
     <main className="container">
       <section className="hero card">
-        <h1>AMZ Free Shipping Checker</h1>
-        <p>
-          Country-aware shipping checker powered by your backend. Enter an Amazon URL, destination,
-          and get a strict free-shipping verdict.
-        </p>
+        <h1>{t("app_title")}</h1>
+        <p>{t("app_subtitle")}</p>
         <div className={`health ${health}`}>
           Backend: {health === "checking" ? "Checking..." : health === "up" ? "Online" : "Offline"}
         </div>
@@ -383,7 +382,7 @@ export default function HomePage() {
           </div>
 
           <div className="row">
-            <button disabled={!canSubmit || loading}>{loading ? "Checking…" : "Check free shipping"}</button>
+            <button disabled={!canSubmit || loading}>{loading ? t("loading") : t("check_button")}</button>
             <label>
               Monitor interval (seconds)
               <input type="number" min={5} max={3600} value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value || 5))} />
@@ -397,10 +396,10 @@ export default function HomePage() {
           </div>
           <div className="row">
             <button type="button" className="secondary" onClick={startMonitor} disabled={!canSubmit}>
-              Start monitor (cron test)
+              {t("monitor_button")}
             </button>
             <button type="button" className="secondary" onClick={addToUserTracking} disabled={!canSubmit}>
-              Add product to test-user panel
+              {t("add_button")}
             </button>
           </div>
         </form>

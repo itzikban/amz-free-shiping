@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
+import { useI18n } from "@/lib/i18n";
 
 export default function ProductsPage() {
+  const { t } = useI18n();
   const [items, setItems] = useState<TrackedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -42,7 +44,7 @@ export default function ProductsPage() {
   return (
     <main className="container">
       <section className="card hero">
-        <h1>Watchlist</h1>
+        <h1>{t("watchlist_title")}</h1>
         <p>Tracked products with destination-specific shipping verdict.</p>
         <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
           <div className="card"><strong>{items.length}</strong><br /><small>Total tracked</small></div>

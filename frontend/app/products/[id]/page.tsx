@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
+import { useI18n } from "@/lib/i18n";
 
 export default function ProductDetailsPage() {
+  const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
   const [items, setItems] = useState<TrackedProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,14 +41,14 @@ export default function ProductDetailsPage() {
   return (
     <main className="container">
       <section className="card">
-        <Link href="/products">← Back to watchlist</Link>
+        <Link href="/products">← {t("back_watchlist")}</Link>
       </section>
       <section className="card">
         {loading && <p>Loading…</p>}
         {!loading && !item && <p className="error">Tracked product not found.</p>}
         {item && (
           <>
-            <h2>Tracked Product Details</h2>
+            <h2>{t("details_title")}</h2>
             <ul>
               <li><strong>ID:</strong> {item.id}</li>
               <li><strong>URL:</strong> <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a></li>
