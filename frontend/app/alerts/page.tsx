@@ -24,7 +24,9 @@ export default function AlertsPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -37,17 +39,17 @@ export default function AlertsPage() {
     <main className="container">
       <section className="card hero">
         <h1>{t("alerts_title")}</h1>
-        <p>In-app alerts for shipping and price changes.</p>
+        <p>{t("alerts_subtitle")}</p>
         <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <button className={filter === "all" ? "" : "secondary"} onClick={() => setFilter("all")}>All</button>
-          <button className={filter === "free" ? "" : "secondary"} onClick={() => setFilter("free")}>Free shipping</button>
-          <button className={filter === "price" ? "" : "secondary"} onClick={() => setFilter("price")}>Price changes</button>
+          <button className={filter === "all" ? "" : "secondary"} onClick={() => setFilter("all")}>{t("alerts_filter_all")}</button>
+          <button className={filter === "free" ? "" : "secondary"} onClick={() => setFilter("free")}>{t("alerts_filter_free")}</button>
+          <button className={filter === "price" ? "" : "secondary"} onClick={() => setFilter("price")}>{t("alerts_filter_price")}</button>
         </div>
       </section>
       <section className="card">
-        {loading ? <p>Loading…</p> : (
+        {loading ? <p>{t("loading")}</p> : (
           <ul>
-            {filtered.length === 0 && <li>No alerts match current filter.</li>}
+            {filtered.length === 0 && <li>{t("alerts_empty_filtered")}</li>}
             {filtered.map((a) => (
               <li key={a.id} className="monitorItem">
                 <div>🔔 {a.message}</div>

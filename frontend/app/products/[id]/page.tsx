@@ -44,21 +44,21 @@ export default function ProductDetailsPage() {
         <Link href="/products">← {t("back_watchlist")}</Link>
       </section>
       <section className="card">
-        {loading && <p>Loading…</p>}
-        {!loading && !item && <p className="error">Tracked product not found.</p>}
+        {loading && <p>{t("loading")}</p>}
+        {!loading && !item && <p className="error">{t("details_not_found")}</p>}
         {item && (
           <>
             <h2>{t("details_title")}</h2>
             <ul>
-              <li><strong>ID:</strong> {item.id}</li>
-              <li><strong>URL:</strong> <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a></li>
-              <li><strong>Country:</strong> {item.country}</li>
-              <li><strong>ZIP:</strong> {item.zip || "-"}</li>
-              <li><strong>Price:</strong> {item.last_price_usd ? `$${item.last_price_usd.toFixed(2)}` : "-"}</li>
-              <li><strong>Free shipping:</strong> {String(item.free_shipping_country)}</li>
-              <li><strong>Signal:</strong> {item.signal}</li>
-              <li><strong>Method:</strong> {item.method || "-"}</li>
-              <li><strong>Last checked:</strong> {new Date(item.last_checked_at).toLocaleString()}</li>
+              <li><strong>{t("details_id")}</strong> {item.id}</li>
+              <li><strong>{t("details_url")}</strong> <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a></li>
+              <li><strong>{t("details_country")}</strong> {item.country}</li>
+              <li><strong>{t("details_zip")}</strong> {item.zip || t("common_dash")}</li>
+              <li><strong>{t("details_price")}</strong> {item.last_price_usd ? `$${item.last_price_usd.toFixed(2)}` : t("common_dash")}</li>
+              <li><strong>{t("details_free_shipping")}</strong> {item.free_shipping_country ? t("common_yes") : t("common_no")}</li>
+              <li><strong>{t("details_signal")}</strong> {item.signal}</li>
+              <li><strong>{t("details_method")}</strong> {item.method || t("common_dash")}</li>
+              <li><strong>{t("details_last_checked")}</strong> {new Date(item.last_checked_at).toLocaleString()}</li>
             </ul>
           </>
         )}

@@ -13,9 +13,9 @@ export default function TopNav() {
         <Link href="/products">{t("nav_watchlist")}</Link>
         <Link href="/alerts">{t("nav_alerts")}</Link>
       </div>
-      <label className="langSelect">
+      <label className="langSelect" htmlFor="lang-select">
         {t("language")}
-        <select value={lang} onChange={(e) => setLang(e.target.value as "en" | "he") }>
+        <select id="lang-select" value={lang} onChange={(e) => setLang(e.target.value as "en" | "he") }>
           <option value="en">English</option>
           <option value="he">עברית</option>
         </select>

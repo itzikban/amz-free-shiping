@@ -45,35 +45,35 @@ export default function ProductsPage() {
     <main className="container">
       <section className="card hero">
         <h1>{t("watchlist_title")}</h1>
-        <p>Tracked products with destination-specific shipping verdict.</p>
+        <p>{t("products_subtitle")}</p>
         <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <div className="card"><strong>{items.length}</strong><br /><small>Total tracked</small></div>
-          <div className="card"><strong>{counts.free}</strong><br /><small>Free shipping</small></div>
-          <div className="card"><strong>{counts.notFree}</strong><br /><small>Not free</small></div>
+          <div className="card"><strong>{items.length}</strong><br /><small>{t("products_total_tracked")}</small></div>
+          <div className="card"><strong>{counts.free}</strong><br /><small>{t("products_free_shipping")}</small></div>
+          <div className="card"><strong>{counts.notFree}</strong><br /><small>{t("products_not_free")}</small></div>
         </div>
-        {usingFallback && <p className="hint">Backend unavailable — showing local fallback sample data.</p>}
+        {usingFallback && <p className="hint">{t("products_fallback_notice")}</p>}
       </section>
 
       <section className="card">
         <div className="row actionsRow">
-          <h3>Tracked products</h3>
-          <Link href="/">+ Add from checker</Link>
+          <h3>{t("products_heading")}</h3>
+          <Link href="/">{t("products_add_from_checker")}</Link>
         </div>
 
-        {loading ? <p>Loading…</p> : (
+        {loading ? <p>{t("loading")}</p> : (
           <ul>
-            {items.length === 0 && <li>No tracked products yet.</li>}
+            {items.length === 0 && <li>{t("products_empty")}</li>}
             {items.map((it) => (
               <li key={it.id} className="monitorItem">
                 <div>
-                  <strong>{it.country}</strong> · {it.free_shipping_country ? "✅ Free" : "❌ Not free"}
+                  <strong>{it.country}</strong> · {it.free_shipping_country ? t("products_status_free") : t("products_status_not_free")}
                   <br />
                   <small>{it.url}</small>
                   <br />
-                  <small>Last checked: {new Date(it.last_checked_at).toLocaleString()}</small>
+                  <small>{t("products_last_checked")} {new Date(it.last_checked_at).toLocaleString()}</small>
                 </div>
                 <div>
-                  <Link href={`/products/${encodeURIComponent(it.id)}`}>View details</Link>
+                  <Link href={`/products/${encodeURIComponent(it.id)}`}>{t("products_view_details")}</Link>
                 </div>
               </li>
             ))}
