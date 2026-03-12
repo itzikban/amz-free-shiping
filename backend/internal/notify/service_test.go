@@ -22,8 +22,8 @@ func TestDispatchDue_RetryAndIdempotency(t *testing.T) {
 	now := time.Now().UTC()
 	key := BuildIdempotencyKey("a1", "in_app", "u1")
 
-	s.Enqueue("a1", "in_app", "u1", key, now)
-	s.Enqueue("a1", "in_app", "u1", key, now)
+	s.Enqueue("a1", "in_app", "u1", "hello", key, now)
+	s.Enqueue("a1", "in_app", "u1", "hello", key, now)
 	if got := len(s.Entries()); got != 1 {
 		t.Fatalf("expected single deduped outbox entry, got %d", got)
 	}

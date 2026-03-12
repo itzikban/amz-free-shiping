@@ -25,9 +25,11 @@ func TestTransitionNotFreeToFree_CreatesTransitionAlertAndNotification(t *testin
 		t.Fatalf("expected at least 2 alerts, got %d", len(alerts))
 	}
 	found := false
+	transitionAlertID := ""
 	for _, a := range alerts {
 		if a.Type == "free_shipping_available" {
 			found = true
+			transitionAlertID = a.ID
 			break
 		}
 	}
@@ -36,15 +38,18 @@ func TestTransitionNotFreeToFree_CreatesTransitionAlertAndNotification(t *testin
 	}
 
 	notifs := svc.ListNotifications(false, 20)
-	if len(notifs) == 0 {
-		t.Fatal("expected notification after delivered outbox dispatch")
+	for _, n := range notifs {
+		if n.AlertID == transitionAlertID {
+			return
+		}
 	}
+	t.Fatalf("expected notification for transition alert %s, got %+v", transitionAlertID, notifs)
 }
 
 func TestRetryFailedNotifications_ProcessesDueEntries(t *testing.T) {
 	svc := New(nil)
 	now := time.Now().UTC()
-	svc.outbox.Enqueue("alert-1", "in_app", svc.user.ID, notify.BuildIdempotencyKey("alert-1", "in_app", svc.user.ID), now)
+	svc.outbox.Enqueue("alert-1", "in_app", svc.user.ID, "hello", notify.BuildIdempotencyKey("alert-1", "in_app", svc.user.ID), now)
 
 	processed, err := svc.RetryFailedNotifications(context.Background(), 100)
 	if err != nil {

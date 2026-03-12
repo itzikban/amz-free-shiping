@@ -77,21 +77,23 @@ type AddTrackedItemReq struct {
 }
 
 type Service struct {
-	checker       *checker.Service
-	mu            sync.RWMutex
-	user          User
-	items         []TrackedItem
-	alerts        []Alert
-	notifications []Notification
-	prefs         NotificationPreferences
-	seq           int
-	productsByKey map[string]Product
-	itemByScope   map[string]int
-	outbox        *notify.Service
+	checker           *checker.Service
+	mu                sync.RWMutex
+	user              User
+	items             []TrackedItem
+	alerts            []Alert
+	notifications     []Notification
+	prefs             NotificationPreferences
+	seq               int
+	productsByKey     map[string]Product
+	itemByScope       map[string]int
+	outbox            *notify.Service
+	notificationIndex map[string]struct{}
+	alertMessages     map[string]string
 }
 
 func New(c *checker.Service) *Service {
-	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}, outbox: notify.New(notify.NewInMemorySender())}
+	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}, outbox: notify.New(notify.NewInMemorySender()), notificationIndex: map[string]struct{}{}, alertMessages: map[string]string{}}
 }
 func (s *Service) Me() User { return s.user }
 func (s *Service) ListItems() []TrackedItem {
@@ -222,7 +224,7 @@ func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Re
 	enqueue := false
 	if s.prefs.InAppEnabled && s.prefs.OnItemAdded && s.outbox != nil {
 		key := notify.BuildIdempotencyKey(alert.ID, "in_app", s.user.ID)
-		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, key, now)
+		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, alert.Message, key, now)
 		enqueue = true
 	}
 	s.mu.Unlock()
@@ -253,6 +255,7 @@ func (s *Service) appendAlert(item TrackedItem, dedup bool, prevStrict bool, now
 		a.Type = "other"
 	}
 	s.alerts = append([]Alert{a}, s.alerts...)
+	s.alertMessages[a.ID] = a.Message
 	if len(s.alerts) > 100 {
 		s.alerts = s.alerts[:100]
 	}
@@ -280,23 +283,33 @@ func (s *Service) syncDeliveredNotifications(now time.Time) {
 	entries := s.outbox.Entries()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.notificationIndex == nil {
+		s.notificationIndex = map[string]struct{}{}
+	}
+	for _, n := range s.notifications {
+		if n.AlertID != "" {
+			s.notificationIndex[n.AlertID] = struct{}{}
+		}
+	}
 	for _, e := range entries {
 		if e.Status != notify.StatusDelivered || e.Channel != "in_app" {
 			continue
 		}
-		if s.hasNotificationForAlert(e.AlertID) {
+		if _, exists := s.notificationIndex[e.AlertID]; exists {
 			continue
 		}
-		msg := "Notification delivered"
-		for _, a := range s.alerts {
-			if a.ID == e.AlertID {
-				msg = a.Message
-				break
+		msg := strings.TrimSpace(e.Message)
+		if msg == "" {
+			if saved := strings.TrimSpace(s.alertMessages[e.AlertID]); saved != "" {
+				msg = saved
+			} else {
+				msg = "Notification delivered"
 			}
 		}
 		s.seq++
 		n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, AlertID: e.AlertID, Title: "Tracking updated", Message: msg, CreatedAt: now}
 		s.notifications = append([]Notification{n}, s.notifications...)
+		s.notificationIndex[e.AlertID] = struct{}{}
 		if len(s.notifications) > 200 {
 			s.notifications = s.notifications[:200]
 		}
@@ -307,12 +320,8 @@ func (s *Service) hasNotificationForAlert(alertID string) bool {
 	if alertID == "" {
 		return false
 	}
-	for _, n := range s.notifications {
-		if n.AlertID == alertID {
-			return true
-		}
-	}
-	return false
+	_, ok := s.notificationIndex[alertID]
+	return ok
 }
 func (s *Service) UserCounts() admin.UserStats {
 	s.mu.RLock()
