@@ -17,8 +17,8 @@ func TestTransitionNotFreeToFree_CreatesTransitionAlertAndNotification(t *testin
 	notFree := checker.Result{CheckedAt: time.Now().UTC(), FreeShipping: false, FreeShippingCountry: false, Signal: "not_free", Method: "mock"}
 	free := checker.Result{CheckedAt: time.Now().UTC().Add(time.Minute), FreeShipping: true, FreeShippingCountry: true, Signal: "free", Method: "mock"}
 
-	svc.addTrackedItemFromResult(req, notFree)
-	svc.addTrackedItemFromResult(req, free)
+	svc.addTrackedItemFromResult(context.Background(), req, notFree)
+	svc.addTrackedItemFromResult(context.Background(), req, free)
 
 	alerts := svc.ListAlerts()
 	if len(alerts) < 2 {

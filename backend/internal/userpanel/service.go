@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"log"
 	"net/url"
 	"strings"
 	"sync"
@@ -189,10 +190,10 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 	if err != nil {
 		return TrackedItem{}, err
 	}
-	return s.addTrackedItemFromResult(req, res), nil
+	return s.addTrackedItemFromResult(ctx, req, res), nil
 }
 
-func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Result) TrackedItem {
+func (s *Service) addTrackedItemFromResult(ctx context.Context, req AddTrackedItemReq, res checker.Result) TrackedItem {
 	now := time.Now().UTC()
 	asin := normalizeASIN(req.URL)
 	canonicalURL := canonicalProductURL(req.URL, asin)
@@ -237,8 +238,11 @@ func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Re
 	s.mu.Unlock()
 
 	if enqueue {
-		_, _ = s.outbox.DispatchDue(context.Background(), time.Now().UTC(), 20)
-		s.syncDeliveredNotifications(time.Now().UTC())
+		now := time.Now().UTC()
+		if _, err := s.outbox.DispatchDue(ctx, now, 20); err != nil {
+			log.Printf("userpanel: dispatching due notifications failed: %v", err)
+		}
+		s.syncDeliveredNotifications(now)
 	}
 	return item
 }
