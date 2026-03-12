@@ -11,6 +11,7 @@ import (
 
 	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
+	"free-ship-checker-go/internal/notify"
 )
 
 type User struct {
@@ -56,6 +57,7 @@ type Alert struct {
 type Notification struct {
 	ID        string     `json:"id"`
 	UserID    string     `json:"user_id"`
+	AlertID   string     `json:"alert_id,omitempty"`
 	Title     string     `json:"title"`
 	Message   string     `json:"message"`
 	Read      bool       `json:"read"`
@@ -85,10 +87,11 @@ type Service struct {
 	seq           int
 	productsByKey map[string]Product
 	itemByScope   map[string]int
+	outbox        *notify.Service
 }
 
 func New(c *checker.Service) *Service {
-	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}}
+	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}, outbox: notify.New(notify.NewInMemorySender())}
 }
 func (s *Service) Me() User { return s.user }
 func (s *Service) ListItems() []TrackedItem {
@@ -197,10 +200,12 @@ func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Re
 	s.productsByKey[canonicalKey] = product
 
 	dedup := false
+	prevStrict := false
 	var item TrackedItem
 	if idx, exists := s.itemByScope[scopeKey]; exists && idx >= 0 && idx < len(s.items) {
 		dedup = true
 		item = s.items[idx]
+		prevStrict = item.FreeShippingStrict
 		item.LastCheckedAt, item.LastPriceUSD, item.FreeShipping, item.FreeShippingStrict, item.Signal, item.Method = res.CheckedAt, res.PriceUSD, res.FreeShipping, res.FreeShippingCountry, res.Signal, res.Method
 		item.URL, item.ASIN, item.CanonicalURL, item.ProductID = req.URL, asin, canonicalURL, product.ID
 		s.items[idx] = item
@@ -213,25 +218,33 @@ func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Re
 		}
 		s.rebuildItemIndex()
 	}
-	alert := s.appendAlert(item, dedup, now)
-	if s.prefs.InAppEnabled && s.prefs.OnItemAdded {
-		s.seq++
-		n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, Title: "Tracking updated", Message: alert.Message, CreatedAt: now}
-		s.notifications = append([]Notification{n}, s.notifications...)
-		if len(s.notifications) > 200 {
-			s.notifications = s.notifications[:200]
-		}
+	alert := s.appendAlert(item, dedup, prevStrict, now)
+	enqueue := false
+	if s.prefs.InAppEnabled && s.prefs.OnItemAdded && s.outbox != nil {
+		key := notify.BuildIdempotencyKey(alert.ID, "in_app", s.user.ID)
+		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, key, now)
+		enqueue = true
 	}
 	s.mu.Unlock()
+
+	if enqueue {
+		_, _ = s.outbox.DispatchDue(context.Background(), time.Now().UTC(), 20)
+		s.syncDeliveredNotifications(time.Now().UTC())
+	}
 	return item
 }
 
-func (s *Service) appendAlert(item TrackedItem, dedup bool, now time.Time) Alert {
+func (s *Service) appendAlert(item TrackedItem, dedup bool, prevStrict bool, now time.Time) Alert {
 	s.seq++
 	a := Alert{ID: makeID("alert", s.seq), UserID: s.user.ID, CreatedAt: now}
 	if dedup {
-		a.Message = "♻️ Tracked item already exists (canonical dedup), refreshed latest check"
-		a.Type = "other"
+		if !prevStrict && item.FreeShippingStrict {
+			a.Message = "🎉 Free shipping became available"
+			a.Type = "free_shipping_available"
+		} else {
+			a.Message = "♻️ Tracked item already exists (canonical dedup), refreshed latest check"
+			a.Type = "other"
+		}
 	} else if item.FreeShippingStrict {
 		a.Message = "✅ Tracked item added: free shipping for destination"
 		a.Type = "free_shipping"
@@ -252,7 +265,54 @@ func (s *Service) rebuildItemIndex() {
 	}
 }
 func (s *Service) RetryFailedNotifications(ctx context.Context, limit int) (int, error) {
-	return 0, nil
+	if s.outbox == nil {
+		return 0, nil
+	}
+	processed, err := s.outbox.DispatchDue(ctx, time.Now().UTC(), limit)
+	s.syncDeliveredNotifications(time.Now().UTC())
+	return processed, err
+}
+
+func (s *Service) syncDeliveredNotifications(now time.Time) {
+	if s.outbox == nil {
+		return
+	}
+	entries := s.outbox.Entries()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, e := range entries {
+		if e.Status != notify.StatusDelivered || e.Channel != "in_app" {
+			continue
+		}
+		if s.hasNotificationForAlert(e.AlertID) {
+			continue
+		}
+		msg := "Notification delivered"
+		for _, a := range s.alerts {
+			if a.ID == e.AlertID {
+				msg = a.Message
+				break
+			}
+		}
+		s.seq++
+		n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, AlertID: e.AlertID, Title: "Tracking updated", Message: msg, CreatedAt: now}
+		s.notifications = append([]Notification{n}, s.notifications...)
+		if len(s.notifications) > 200 {
+			s.notifications = s.notifications[:200]
+		}
+	}
+}
+
+func (s *Service) hasNotificationForAlert(alertID string) bool {
+	if alertID == "" {
+		return false
+	}
+	for _, n := range s.notifications {
+		if n.AlertID == alertID {
+			return true
+		}
+	}
+	return false
 }
 func (s *Service) UserCounts() admin.UserStats {
 	s.mu.RLock()
