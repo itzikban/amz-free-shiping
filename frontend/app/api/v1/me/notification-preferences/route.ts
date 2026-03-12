@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { fetchWithTimeout } from "@/lib/api/fetchWithTimeout";
+
+export const dynamic = 'force-dynamic';
+
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://127.0.0.1:8085";
 
 export async function GET() {
