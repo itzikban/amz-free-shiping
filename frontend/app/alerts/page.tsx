@@ -40,20 +40,33 @@ export default function AlertsPage() {
       <section className="card hero">
         <h1>{t("alerts_title")}</h1>
         <p>{t("alerts_subtitle")}</p>
-        <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <button className={filter === "all" ? "" : "secondary"} onClick={() => setFilter("all")}>{t("alerts_filter_all")}</button>
-          <button className={filter === "free" ? "" : "secondary"} onClick={() => setFilter("free")}>{t("alerts_filter_free")}</button>
-          <button className={filter === "price" ? "" : "secondary"} onClick={() => setFilter("price")}>{t("alerts_filter_price")}</button>
+
+        <div className="chipRow" style={{ marginTop: 12 }}>
+          <button className={filter === "all" ? "" : "secondary"} onClick={() => setFilter("all")}>
+            {t("alerts_filter_all")}
+          </button>
+          <button className={filter === "free" ? "" : "secondary"} onClick={() => setFilter("free")}>
+            {t("alerts_filter_free")}
+          </button>
+          <button className={filter === "price" ? "" : "secondary"} onClick={() => setFilter("price")}>
+            {t("alerts_filter_price")}
+          </button>
         </div>
       </section>
+
       <section className="card">
-        {loading ? <p>{t("loading")}</p> : (
-          <ul>
+        {loading ? (
+          <p>{t("loading")}</p>
+        ) : (
+          <ul className="listClean">
             {filtered.length === 0 && <li>{t("alerts_empty_filtered")}</li>}
             {filtered.map((a) => (
-              <li key={a.id} className="monitorItem">
-                <div>🔔 {a.message}</div>
-                <small>{new Date(a.created_at).toLocaleString()}</small>
+              <li key={a.id} className="timelineItem">
+                <div className="timelineDot" />
+                <div>
+                  <small>{new Date(a.created_at).toLocaleString()}</small>
+                  <div>{a.message}</div>
+                </div>
               </li>
             ))}
           </ul>

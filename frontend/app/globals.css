@@ -208,6 +208,59 @@ small { color: var(--muted); }
 .split { grid-template-columns: 1fr 1fr; }
 h4 { margin: 0 0 8px; }
 
+.statGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.kpiCard {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(8, 14, 28, .55);
+  display: grid;
+  gap: 6px;
+}
+.kpiCard span { color: var(--muted); font-size: .82rem; }
+.kpiCard strong { font-size: 1.35rem; }
+.kpiCard.ok { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.kpiCard.no { border-color: color-mix(in srgb, var(--no) 55%, transparent); }
+
+.listClean { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.chipRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.signalPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: .78rem;
+  border: 1px solid var(--line);
+  background: rgba(7, 12, 24, .7);
+}
+.signalPill.ok { color: #beffe0; border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.signalPill.no { color: #ffd0dc; border-color: color-mix(in srgb, var(--no) 55%, transparent); }
+.signalPill.neutral { color: #d7e6ff; }
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(8, 14, 28, .55);
+}
+.timelineDot {
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
+  box-shadow: 0 0 10px rgba(33,212,253,.65);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: .65; }
   50% { opacity: 1; }
@@ -221,7 +274,7 @@ h4 { margin: 0 0 8px; }
 }
 
 @media (max-width: 640px) {
-  .row, .split { grid-template-columns: 1fr; }
+  .row, .split, .statGrid { grid-template-columns: 1fr; }
   .hero h1 { font-size: 1.45rem; }
   .topNav { flex-direction: column; align-items: stretch; }
   .topNavLinks { justify-content: space-between; }
