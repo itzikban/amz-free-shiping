@@ -1,31 +1,40 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { FALLBACK_TRACKED_PRODUCTS, TrackedProduct } from "@/lib/watchlist";
+import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
 
-export default function ProductDetailsPage({ params }: { params: { id: string } }) {
+export default function ProductDetailsPage() {
+  const { id } = useParams<{ id: string }>();
   const [items, setItems] = useState<TrackedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/v1/me/tracked-items", { cache: "no-store" });
+        const res = await fetch(`/api/v1/me/tracked-items/${encodeURIComponent(id)}`, { cache: "no-store" });
         if (!res.ok) throw new Error("failed");
         const body = await res.json();
-        if (!cancelled) setItems(body.items || []);
+        if (!cancelled) setItems(body.item ? [body.item] : []);
       } catch {
-        if (!cancelled) setItems(FALLBACK_TRACKED_PRODUCTS);
+        if (!cancelled) setItems(getFallbackTrackedProducts());
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
-  const item = useMemo(() => items.find((x) => x.id === params.id), [items, params.id]);
+  const item = useMemo(() => items.find((x) => x.id === id), [items, id]);
 
   return (
     <main className="container">
@@ -40,7 +49,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
             <h2>Tracked Product Details</h2>
             <ul>
               <li><strong>ID:</strong> {item.id}</li>
-              <li><strong>URL:</strong> <a href={item.url} target="_blank">{item.url}</a></li>
+              <li><strong>URL:</strong> <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a></li>
               <li><strong>Country:</strong> {item.country}</li>
               <li><strong>ZIP:</strong> {item.zip || "-"}</li>
               <li><strong>Price:</strong> {item.last_price_usd ? `$${item.last_price_usd.toFixed(2)}` : "-"}</li>

@@ -118,6 +118,24 @@ func NewRouter() http.Handler {
 		writeJSON(w, http.StatusOK, usvc.Me())
 	})
 
+	mux.HandleFunc("/v1/me/tracked-items/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		id := strings.TrimPrefix(r.URL.Path, "/v1/me/tracked-items/")
+		if id == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing id"})
+			return
+		}
+		item, ok := usvc.GetItem(id)
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "tracked item not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"item": item})
+	})
+
 	mux.HandleFunc("/v1/me/tracked-items", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			writeJSON(w, http.StatusOK, map[string]any{"items": usvc.ListItems()})

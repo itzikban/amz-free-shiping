@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FALLBACK_ALERTS, UserAlert } from "@/lib/watchlist";
+import { getFallbackAlerts, UserAlert } from "@/lib/watchlist";
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<UserAlert[]>([]);
@@ -17,7 +17,7 @@ export default function AlertsPage() {
         const body = await res.json();
         if (!cancelled) setAlerts(body.alerts || []);
       } catch {
-        if (!cancelled) setAlerts(FALLBACK_ALERTS);
+        if (!cancelled) setAlerts(getFallbackAlerts());
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -27,8 +27,8 @@ export default function AlertsPage() {
 
   const filtered = useMemo(() => {
     if (filter === "all") return alerts;
-    if (filter === "free") return alerts.filter((x) => x.message.toLowerCase().includes("free shipping"));
-    return alerts.filter((x) => x.message.toLowerCase().includes("price"));
+    if (filter === "free") return alerts.filter((x) => x.type === "free_shipping");
+    return alerts.filter((x) => x.type === "price_change");
   }, [alerts, filter]);
 
   return (

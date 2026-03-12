@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { FALLBACK_TRACKED_PRODUCTS, TrackedProduct } from "@/lib/watchlist";
+import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
 
 export default function ProductsPage() {
   const [items, setItems] = useState<TrackedProduct[]>([]);
@@ -22,7 +22,7 @@ export default function ProductsPage() {
         }
       } catch {
         if (!cancelled) {
-          setItems(FALLBACK_TRACKED_PRODUCTS);
+          setItems(getFallbackTrackedProducts());
           setUsingFallback(true);
         }
       } finally {
@@ -36,7 +36,7 @@ export default function ProductsPage() {
 
   const counts = useMemo(() => ({
     free: items.filter((x) => x.free_shipping_country).length,
-    blocked: items.filter((x) => !x.free_shipping_country).length,
+    notFree: items.filter((x) => !x.free_shipping_country).length,
   }), [items]);
 
   return (
@@ -47,7 +47,7 @@ export default function ProductsPage() {
         <div className="row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
           <div className="card"><strong>{items.length}</strong><br /><small>Total tracked</small></div>
           <div className="card"><strong>{counts.free}</strong><br /><small>Free shipping</small></div>
-          <div className="card"><strong>{counts.blocked}</strong><br /><small>Not free</small></div>
+          <div className="card"><strong>{counts.notFree}</strong><br /><small>Not free</small></div>
         </div>
         {usingFallback && <p className="hint">Backend unavailable — showing local fallback sample data.</p>}
       </section>
