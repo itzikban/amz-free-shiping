@@ -53,33 +53,7 @@ a { color: #cce3ff; }
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  overflow: hidden;
 }
-.neuralBackdrop svg {
-  width: 100%;
-  height: 100%;
-  opacity: 0.26;
-}
-.neuralLine {
-  stroke: rgba(71, 183, 255, 0.65);
-  stroke-width: 0.11;
-  stroke-dasharray: 0.6 0.8;
-  animation: dash 18s linear infinite;
-}
-.neuralNode {
-  fill: #9fe8ff;
-  filter: drop-shadow(0 0 6px rgba(33, 212, 253, 0.8));
-  animation: pulse 2.6s ease-in-out infinite;
-}
-.glowOrb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(40px);
-  opacity: .2;
-}
-.orbA { width: 320px; height: 320px; background: var(--brand-a); top: 8%; left: -80px; animation: drift 16s ease-in-out infinite; }
-.orbB { width: 280px; height: 280px; background: var(--brand-b); top: 50%; right: -60px; animation: drift 21s ease-in-out infinite reverse; }
-.orbC { width: 220px; height: 220px; background: #4df3c0; bottom: -70px; left: 30%; animation: drift 18s ease-in-out infinite; }
 
 .topNav {
   position: sticky;
@@ -285,9 +259,7 @@ h4 { margin: 0 0 8px; }
   0%, 100% { opacity: .65; }
   50% { opacity: 1; }
 }
-@keyframes dash {
-  to { stroke-dashoffset: -10; }
-}
+
 @keyframes drift {
   0%, 100% { transform: translateY(0px) translateX(0px); }
   50% { transform: translateY(-12px) translateX(8px); }
@@ -381,4 +353,14 @@ h4 { margin: 0 0 8px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
+}
+
+.search-container input.clean-input,
+.search-container select.clean-input {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  outline: none;
+  width: 100%;
+  padding: 8px 4px;
 }

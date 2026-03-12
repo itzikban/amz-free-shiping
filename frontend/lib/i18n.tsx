@@ -235,10 +235,12 @@ const I18nContext = createContext<I18nContextType | null>(null);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const next: Lang = localStorage.getItem("ui_lang") === "he" ? "he" : "en";
     setLangState(next);
+    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -269,7 +271,13 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     };
   }, [lang, setLang]);
 
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return (
+    <I18nContext.Provider value={value}>
+      <div suppressHydrationWarning style={mounted ? undefined : { visibility: "hidden" }}>
+        {children}
+      </div>
+    </I18nContext.Provider>
+  );
 }
 
 export function useI18n() {

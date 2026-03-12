@@ -172,8 +172,7 @@ export default function HomePage() {
                 <button className="secondary" type="button" onClick={addToWatchlist} disabled={addingWatchlist || watchlistAdded}>
                   {addingWatchlist ? t("loading") : watchlistAdded ? t("watchlist_added") : t("add_button")}
                 </button>
-                <span className="signalPill neutral btn-alert-pulse" role="status" aria-live="polite">{t("home_coming_soon_short")}</span>
-                <span className="mutedText">{t("home_alert_cta_disabled")}</span>
+                <span className="signalPill neutral" role="status">{t("home_alert_cta_disabled")}</span>
               </div>
             )}
           </div>
