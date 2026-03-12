@@ -146,7 +146,7 @@ export default function HomePage() {
               <>
                 <p className="mutedText">{result.url}</p>
                 <div className="targetMeta">
-                  <span className="priceTag">{result.price_usd ? `$${result.price_usd.toFixed(2)}` : "-"}</span>
+                  <span className="priceTag">{result.price_usd != null ? `$${result.price_usd.toFixed(2)}` : "-"}</span>
                   <span className={`signalPill ${result.free_shipping_country ? "ok" : "no"}`}>
                     {result.free_shipping_country ? t("free_for_destination") : t("not_free_for_destination")}
                   </span>
@@ -170,22 +170,26 @@ export default function HomePage() {
         </section>
       )}
 
-      <section className="flowHint animate-flow-3">
-        <span>{t("home_flow_hint")}</span>
-      </section>
+      {loading && (
+        <>
+          <section className="flowHint animate-flow-3">
+            <span>{t("home_flow_hint")}</span>
+          </section>
 
-      <section className="recommendGrid animate-flow-3">
-        {recommendations.map((r) => (
-          <article key={r.id} className="fluid-card recCard">
-            <div className={`recImage ${r.cls}`} />
-            <h4>{t(r.titleKey)}</h4>
-            <div className="recMeta">
-              <strong>{r.price}</strong>
-              <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
-            </div>
-          </article>
-        ))}
-      </section>
+          <section className="recommendGrid animate-flow-3">
+            {recommendations.map((r) => (
+              <article key={r.id} className="fluid-card recCard">
+                <div className={`recImage ${r.cls}`} />
+                <h4>{t(r.titleKey)}</h4>
+                <div className="recMeta">
+                  <strong>{r.price}</strong>
+                  <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
+                </div>
+              </article>
+            ))}
+          </section>
+        </>
+      )}
     </main>
   );
 }
