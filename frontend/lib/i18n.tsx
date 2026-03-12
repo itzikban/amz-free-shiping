@@ -12,6 +12,20 @@ const dictionaries = {
     language: "Language",
     app_title: "AMZ Free Shipping Checker",
     app_subtitle: "Country-aware shipping checker powered by your backend.",
+    home_discover_title: "Discover Global Shipping",
+    home_url_placeholder: "Paste Amazon URL here...",
+    home_country_il: "Israel (IL)",
+    home_country_us: "United States (US)",
+    home_zip_placeholder: "ZIP",
+    home_analyze: "Analyze",
+    home_target_analysis: "Target Analysis",
+    home_alert_cta_disabled: "Alert feature coming soon",
+    home_flow_hint: "While you wait, we found alternatives with free shipping",
+    rec_title_1: "Sony WH-1000XM5 (International Version)",
+    rec_title_2: "Sony WH-1000XM5 Wireless - Silver",
+    rec_title_3: "Bose QuietComfort Ultra - Black",
+    rec_tag_free_shipping: "FREE SHIPPING",
+    rec_tag_best_match: "BEST MATCH",
     check_button: "Check free shipping",
     add_button: "Add product to watchlist",
     monitor_button: "Start monitor",
@@ -35,6 +49,8 @@ const dictionaries = {
     products_empty: "No tracked products yet.",
     products_last_checked: "Last checked:",
     products_view_details: "View details",
+    products_search_placeholder: "Search URL / country",
+    products_no_results: "No matching products for this search.",
     products_status_free: "✅ Free",
     products_status_not_free: "❌ Not free",
     details_not_found: "Tracked product not found.",
@@ -77,6 +93,20 @@ const dictionaries = {
     language: "שפה",
     app_title: "בודק משלוח חינם באמזון",
     app_subtitle: "בדיקת משלוח לפי מדינה, עם מעקב והתראות.",
+    home_discover_title: "גלו משלוחים גלובליים",
+    home_url_placeholder: "הדביקו כאן קישור אמזון...",
+    home_country_il: "ישראל (IL)",
+    home_country_us: "ארצות הברית (US)",
+    home_zip_placeholder: "מיקוד",
+    home_analyze: "נתח",
+    home_target_analysis: "ניתוח יעד",
+    home_alert_cta_disabled: "תכונת התראות תתווסף בקרוב",
+    home_flow_hint: "בזמן ההמתנה, מצאנו חלופות עם משלוח חינם",
+    rec_title_1: "Sony WH-1000XM5 (גרסה בינלאומית)",
+    rec_title_2: "Sony WH-1000XM5 אלחוטי - כסף",
+    rec_title_3: "Bose QuietComfort Ultra - שחור",
+    rec_tag_free_shipping: "משלוח חינם",
+    rec_tag_best_match: "ההתאמה הטובה ביותר",
     check_button: "בדוק משלוח חינם",
     add_button: "הוסף למעקב",
     monitor_button: "התחל ניטור",
@@ -100,6 +130,8 @@ const dictionaries = {
     products_empty: "עדיין אין מוצרים במעקב.",
     products_last_checked: "נבדק לאחרונה:",
     products_view_details: "צפה בפרטים",
+    products_search_placeholder: "חיפוש לפי קישור / מדינה",
+    products_no_results: "לא נמצאו מוצרים שמתאימים לחיפוש.",
     products_status_free: "✅ חינם",
     products_status_not_free: "❌ לא חינם",
     details_not_found: "המוצר במעקב לא נמצא.",
@@ -144,15 +176,13 @@ type I18nContextType = {
   dir: "ltr" | "rtl";
   setLang: (lang: Lang) => void;
   t: (key: TranslationKey) => string;
+  formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string;
 };
 
 const I18nContext = createContext<I18nContextType | null>(null);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    if (typeof window === "undefined") return "en";
-    return localStorage.getItem("ui_lang") === "he" ? "he" : "en";
-  });
+  const [lang, setLangState] = useState<Lang>("en");
 
   useEffect(() => {
     const next: Lang = localStorage.getItem("ui_lang") === "he" ? "he" : "en";
@@ -173,11 +203,17 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<I18nContextType>(() => {
     const dir = lang === "he" ? "rtl" : "ltr";
     const dict = dictionaries[lang];
+    const locale = lang === "he" ? "he-IL" : "en-US";
     return {
       lang,
       dir,
       setLang,
       t: (key: TranslationKey) => dict[key],
+      formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => {
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value ?? "");
+        return new Intl.DateTimeFormat(locale, options).format(date);
+      },
     };
   }, [lang, setLang]);
 

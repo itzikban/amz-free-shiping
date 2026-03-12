@@ -6,7 +6,7 @@ import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
 import { useI18n } from "@/lib/i18n";
 
 export default function ProductsPage() {
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
   const [items, setItems] = useState<TrackedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -85,7 +85,7 @@ export default function ProductsPage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search URL / country"
+          placeholder={t("products_search_placeholder")}
           style={{ marginBottom: 12 }}
         />
 
@@ -93,7 +93,7 @@ export default function ProductsPage() {
           <p>{t("loading")}</p>
         ) : (
           <ul className="listClean">
-            {filtered.length === 0 && <li>{t("products_empty")}</li>}
+            {filtered.length === 0 && <li>{query.trim() ? t("products_no_results") : t("products_empty")}</li>}
             {filtered.map((it) => (
               <li key={it.id} className="monitorItem">
                 <div>
@@ -106,7 +106,7 @@ export default function ProductsPage() {
                   <small>{it.url}</small>
                   <br />
                   <small>
-                    {t("products_last_checked")} {new Date(it.last_checked_at).toLocaleString()}
+                    {t("products_last_checked")} {formatDate(it.last_checked_at)}
                   </small>
                 </div>
                 <div>

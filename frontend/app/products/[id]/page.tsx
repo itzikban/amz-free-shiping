@@ -7,7 +7,7 @@ import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
 import { useI18n } from "@/lib/i18n";
 
 export default function ProductDetailsPage() {
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
   const { id } = useParams<{ id: string }>();
   const [items, setItems] = useState<TrackedProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,7 @@ export default function ProductDetailsPage() {
               <li><strong>{t("details_free_shipping")}</strong> {item.free_shipping_country ? t("common_yes") : t("common_no")}</li>
               <li><strong>{t("details_signal")}</strong> {item.signal}</li>
               <li><strong>{t("details_method")}</strong> {item.method || t("common_dash")}</li>
-              <li><strong>{t("details_last_checked")}</strong> {new Date(item.last_checked_at).toLocaleString()}</li>
+              <li><strong>{t("details_last_checked")}</strong> {formatDate(item.last_checked_at)}</li>
             </ul>
           </>
         )}

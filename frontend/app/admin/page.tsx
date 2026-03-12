@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 type Metrics = {
   generated_at: string;
@@ -13,6 +14,7 @@ type Metrics = {
 };
 
 export default function AdminPage() {
+  const { formatDate } = useI18n();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [msg, setMsg] = useState<string>("");
   const [metricsError, setMetricsError] = useState<string>("");
@@ -132,7 +134,7 @@ export default function AdminPage() {
             <li>Monitor notifications: {metrics.notifications}</li>
             <li>User tracked items: {metrics.user_tracked_items}</li>
             <li>User alerts: {metrics.user_alerts}</li>
-            <li>Generated: {new Date(metrics.generated_at).toLocaleString()}</li>
+            <li>Generated: {formatDate(metrics.generated_at)}</li>
           </ul>
         )}
       </section>

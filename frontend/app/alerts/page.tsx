@@ -5,7 +5,7 @@ import { getFallbackAlerts, UserAlert } from "@/lib/watchlist";
 import { useI18n } from "@/lib/i18n";
 
 export default function AlertsPage() {
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
   const [alerts, setAlerts] = useState<UserAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "free" | "price">("all");
@@ -64,7 +64,7 @@ export default function AlertsPage() {
               <li key={a.id} className="timelineItem">
                 <div className="timelineDot" />
                 <div>
-                  <small>{new Date(a.created_at).toLocaleString()}</small>
+                  <small>{formatDate(a.created_at)}</small>
                   <div>{a.message}</div>
                 </div>
               </li>

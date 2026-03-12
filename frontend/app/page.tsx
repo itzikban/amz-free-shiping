@@ -69,15 +69,15 @@ export default function HomePage() {
   }
 
   const recommendations = [
-    { id: 1, title: "Sony WH-1000XM5 (International Version)", price: "$345", tag: "FREE SHIPPING", cls: "img-placeholder-1" },
-    { id: 2, title: "Sony WH-1000XM5 Wireless - Silver", price: "$348", tag: "BEST MATCH", cls: "img-placeholder-2" },
-    { id: 3, title: "Bose QuietComfort Ultra - Black", price: "$429", tag: "FREE SHIPPING", cls: "img-placeholder-3" },
-  ];
+    { id: 1, titleKey: "rec_title_1", price: "$345", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-1" },
+    { id: 2, titleKey: "rec_title_2", price: "$348", tagKey: "rec_tag_best_match", cls: "img-placeholder-2" },
+    { id: 3, titleKey: "rec_title_3", price: "$429", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-3" },
+  ] as const;
 
   return (
     <main className="container nexusHome">
       <section className="heroCenter animate-flow-1">
-        <h1>Discover Global Shipping</h1>
+        <h1>{t("home_discover_title")}</h1>
         <p>{t("app_subtitle")}</p>
 
         <form className="search-container" onSubmit={onSubmit}>
@@ -87,7 +87,7 @@ export default function HomePage() {
               type="url"
               value={form.url}
               onChange={(e) => setForm((x) => ({ ...x, url: e.target.value }))}
-              placeholder="Paste Amazon URL here..."
+              placeholder={t("home_url_placeholder")}
               required
             />
           </div>
@@ -98,8 +98,8 @@ export default function HomePage() {
               value={form.country}
               onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" }))}
             >
-              <option value="IL">Israel (IL)</option>
-              <option value="US">United States (US)</option>
+              <option value="IL">{t("home_country_il")}</option>
+              <option value="US">{t("home_country_us")}</option>
             </select>
           </div>
 
@@ -110,13 +110,13 @@ export default function HomePage() {
                 type="text"
                 value={form.zip}
                 onChange={(e) => setForm((x) => ({ ...x, zip: e.target.value }))}
-                placeholder="ZIP"
+                placeholder={t("home_zip_placeholder")}
               />
             </div>
           )}
 
           <button className="analyzeBtn" disabled={!canSubmit || loading}>
-            {loading ? t("loading") : "Analyze"}
+            {loading ? t("loading") : t("home_analyze")}
           </button>
         </form>
       </section>
@@ -125,7 +125,7 @@ export default function HomePage() {
         <section className="fluid-card targetCard animate-flow-2">
           <div className="targetImage img-placeholder-main" />
           <div className="targetBody">
-            <h3>Target Analysis</h3>
+            <h3>{t("home_target_analysis")}</h3>
             {error && <p className="error">{error}</p>}
             {result && (
               <>
@@ -145,24 +145,26 @@ export default function HomePage() {
             )}
             <div className="targetActions">
               <button className="secondary" type="button" onClick={addToWatchlist}>{t("add_button")}</button>
-              <button className="btn-alert-pulse" type="button">Alert me on Free Shipping</button>
+              <button className="btn-alert-pulse" type="button" disabled aria-disabled="true" title={t("home_alert_cta_disabled")}>
+                {t("home_alert_cta_disabled")}
+              </button>
             </div>
           </div>
         </section>
       )}
 
       <section className="flowHint animate-flow-3">
-        <span>While you wait, we found alternatives with free shipping</span>
+        <span>{t("home_flow_hint")}</span>
       </section>
 
       <section className="recommendGrid animate-flow-3">
         {recommendations.map((r) => (
           <article key={r.id} className="fluid-card recCard">
             <div className={`recImage ${r.cls}`} />
-            <h4>{r.title}</h4>
+            <h4>{t(r.titleKey)}</h4>
             <div className="recMeta">
               <strong>{r.price}</strong>
-              <span className={`signalPill ${r.tag === "BEST MATCH" ? "neutral" : "ok"}`}>{r.tag}</span>
+              <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
             </div>
           </article>
         ))}
