@@ -1,17 +1,15 @@
-import { timingSafeEqual } from 'crypto';
-
-const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN;
+const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN?.trim();
 
 function hasNonEmptyToken(token: string | undefined): token is string {
   return typeof token === 'string' && token.trim().length > 0;
 }
 
-function constantTimeEquals(a: string, b: string): boolean {
-  if (!a || !b) return false;
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-  if (aBuf.length !== bBuf.length) return false;
-  return timingSafeEqual(aBuf, bBuf);
+function normalizeToken(v: string): string {
+  return decodeURIComponent(v || '').trim().replace(/^"|"$/g, '');
+}
+
+function equalsToken(provided: string, expected: string): boolean {
+  return normalizeToken(provided) === normalizeToken(expected);
 }
 
 function getCookie(req: Request, name: string): string {
@@ -35,12 +33,12 @@ function getCookie(req: Request, name: string): string {
 function hasValidAdminHeader(req: Request): boolean {
   if (!hasNonEmptyToken(ADMIN_API_TOKEN)) return false;
   const provided = req.headers.get('x-admin-token') || '';
-  return constantTimeEquals(provided, ADMIN_API_TOKEN);
+  return equalsToken(provided, ADMIN_API_TOKEN);
 }
 
 function hasValidAdminCookie(req: Request): boolean {
   if (!hasNonEmptyToken(ADMIN_API_TOKEN)) return false;
-  return constantTimeEquals(getCookie(req, 'admin_session'), ADMIN_API_TOKEN);
+  return equalsToken(getCookie(req, 'admin_session'), ADMIN_API_TOKEN);
 }
 
 export function isAuthorized(req: Request): boolean {

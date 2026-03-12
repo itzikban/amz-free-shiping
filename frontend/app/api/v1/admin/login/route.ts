@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 const ADMIN_USERNAME = process.env.LOCAL_ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.LOCAL_ADMIN_PASSWORD;
-const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN;
+const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN?.trim();
 
 function safeCompare(a: string, b: string): boolean {
   const aBuf = Buffer.from(a);
@@ -32,11 +32,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
   }
 
+  const isHttps = (() => {
+    try {
+      const proto = req.headers.get("x-forwarded-proto");
+      if (proto) return proto.toLowerCase().includes("https");
+      return new URL(req.url).protocol === "https:";
+    } catch {
+      return false;
+    }
+  })();
+
   const res = NextResponse.json({ ok: true });
   res.cookies.set("admin_session", ADMIN_API_TOKEN, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" && isHttps,
     path: "/",
     maxAge: 60 * 60 * 8,
   });
