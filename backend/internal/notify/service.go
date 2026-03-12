@@ -21,8 +21,10 @@ type Entry struct {
 	Address        string     `json:"address"`
 	IdempotencyKey string     `json:"idempotency_key"`
 	Status         string     `json:"status"`
+	Attempts       int        `json:"attempts"`
 	CreatedAt      time.Time  `json:"created_at"`
 	SentAt         *time.Time `json:"sent_at,omitempty"`
+	NextAttemptAt  *time.Time `json:"next_attempt_at,omitempty"`
 }
 
 type Sender interface {
@@ -51,10 +53,15 @@ func New(sender Sender) *Service {
 func (s *Service) Enqueue(alertID, channel, address, idempotencyKey string, now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, e := range s.entries {
-		if e.IdempotencyKey == idempotencyKey {
-			return
+	for i, e := range s.entries {
+		if e.IdempotencyKey != idempotencyKey {
+			continue
 		}
+		if e.Status != StatusDelivered {
+			s.entries[i].Status = StatusPending
+			s.entries[i].NextAttemptAt = nil
+		}
+		return
 	}
 	s.entries = append(s.entries, Entry{
 		AlertID:        alertID,
@@ -67,30 +74,72 @@ func (s *Service) Enqueue(alertID, channel, address, idempotencyKey string, now 
 }
 
 func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if limit <= 0 {
+		s.mu.Lock()
 		limit = len(s.entries)
+		s.mu.Unlock()
 	}
+
 	processed := 0
 	var errs []error
-	for i := range s.entries {
-		if processed >= limit {
+	cursor := 0
+	now = now.UTC()
+
+	for processed < limit {
+		s.mu.Lock()
+		if cursor >= len(s.entries) {
+			s.mu.Unlock()
 			break
 		}
-		if s.entries[i].Status != StatusPending {
+
+		entry := s.entries[cursor]
+		idx := cursor
+		cursor++
+
+		if entry.Status != StatusPending {
+			s.mu.Unlock()
 			continue
 		}
-		if err := s.sender.Send(ctx, s.entries[i]); err != nil {
-			s.entries[i].Status = StatusFailed
-			errs = append(errs, err)
+		if entry.NextAttemptAt != nil && entry.NextAttemptAt.After(now) {
+			s.mu.Unlock()
 			continue
 		}
-		t := now.UTC()
-		s.entries[i].Status = StatusDelivered
-		s.entries[i].SentAt = &t
-		processed++
+
+		entry.Attempts++
+		s.entries[idx].Attempts = entry.Attempts
+		s.mu.Unlock()
+
+		err := s.sender.Send(ctx, entry)
+
+		s.mu.Lock()
+		if idx >= len(s.entries) || s.entries[idx].IdempotencyKey != entry.IdempotencyKey {
+			idx = -1
+			for i := range s.entries {
+				if s.entries[i].IdempotencyKey == entry.IdempotencyKey {
+					idx = i
+					break
+				}
+			}
+		}
+		if idx >= 0 {
+			if err != nil {
+				delay := time.Duration(min(s.entries[idx].Attempts, 5)) * time.Minute
+				next := now.Add(delay)
+				s.entries[idx].Status = StatusPending
+				s.entries[idx].NextAttemptAt = &next
+				err = errors.New("dispatch failed: " + err.Error())
+				errs = append(errs, err)
+			} else {
+				t := now
+				s.entries[idx].Status = StatusDelivered
+				s.entries[idx].SentAt = &t
+				s.entries[idx].NextAttemptAt = nil
+				processed++
+			}
+		}
+		s.mu.Unlock()
 	}
+
 	return processed, errors.Join(errs...)
 }
 
