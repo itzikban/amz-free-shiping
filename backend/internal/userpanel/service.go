@@ -131,6 +131,10 @@ func (s *Service) ListNotifications(unreadOnly bool, limit int) []Notification {
 		if unreadOnly && n.Read {
 			continue
 		}
+		if n.ReadAt != nil {
+			readAt := *n.ReadAt
+			n.ReadAt = &readAt
+		}
 		out = append(out, n)
 		if len(out) >= limit {
 			break
@@ -373,7 +377,8 @@ func canonicalProductKey(canonicalURL, asin string) string {
 }
 
 func dedupScopeKey(userID, canonicalKey, country, zip string) string {
-	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + strings.TrimSpace(zip) + "|" + canonicalKey
+	normalizedZIP := strings.ToUpper(strings.TrimSpace(zip))
+	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + normalizedZIP + "|" + canonicalKey
 }
 
 func makeID(prefix string, n int) string {
