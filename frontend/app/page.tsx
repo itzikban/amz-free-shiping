@@ -193,7 +193,10 @@ export default function HomePage() {
                 <h4>{t(r.titleKey)}</h4>
                 <div className="recMeta">
                   <strong>{r.price}</strong>
-                  <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
+                  <div className="chipRow">
+                    <span className="signalPill neutral">{t("home_demo_label")}</span>
+                    <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
+                  </div>
                 </div>
               </article>
             ))}
