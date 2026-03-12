@@ -2,11 +2,16 @@ package userpanel
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
+	"free-ship-checker-go/internal/notify"
 )
 
 type User struct {
@@ -17,6 +22,9 @@ type User struct {
 type TrackedItem struct {
 	ID                 string    `json:"id"`
 	UserID             string    `json:"user_id"`
+	ProductID          string    `json:"product_id"`
+	ASIN               string    `json:"asin,omitempty"`
+	CanonicalURL       string    `json:"canonical_url"`
 	URL                string    `json:"url"`
 	Country            string    `json:"country"`
 	ZIP                string    `json:"zip,omitempty"`
@@ -29,11 +37,35 @@ type TrackedItem struct {
 	Method             string    `json:"method"`
 }
 
+type Product struct {
+	ID             string    `json:"id"`
+	ASIN           string    `json:"asin,omitempty"`
+	CanonicalURL   string    `json:"canonical_url"`
+	CanonicalKey   string    `json:"canonical_key"`
+	FirstSeenAt    time.Time `json:"first_seen_at"`
+	LastObservedAt time.Time `json:"last_observed_at"`
+}
+
 type Alert struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type Notification struct {
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Title     string     `json:"title"`
+	Message   string     `json:"message"`
+	Read      bool       `json:"read"`
+	CreatedAt time.Time  `json:"created_at"`
+	ReadAt    *time.Time `json:"read_at,omitempty"`
+}
+
+type NotificationPreferences struct {
+	InAppEnabled bool `json:"in_app_enabled"`
+	OnItemAdded  bool `json:"on_item_added"`
 }
 
 type AddTrackedItemReq struct {
@@ -43,16 +75,31 @@ type AddTrackedItemReq struct {
 }
 
 type Service struct {
-	checker *checker.Service
-	mu      sync.RWMutex
-	user    User
-	items   []TrackedItem
-	alerts  []Alert
-	seq     int
+	checker       *checker.Service
+	mu            sync.RWMutex
+	user          User
+	items         []TrackedItem
+	alerts        []Alert
+	notifications []Notification
+	prefs         NotificationPreferences
+	seq           int
+	productsByKey map[string]Product
+	itemByScope   map[string]int
+	outbox        *notify.Service
 }
 
 func New(c *checker.Service) *Service {
-	return &Service{checker: c, user: User{ID: "test-user", Name: "test-user"}, items: []TrackedItem{}, alerts: []Alert{}}
+	return &Service{
+		checker:       c,
+		user:          User{ID: "test-user", Name: "test-user"},
+		items:         []TrackedItem{},
+		alerts:        []Alert{},
+		notifications: []Notification{},
+		prefs:         NotificationPreferences{InAppEnabled: true, OnItemAdded: true},
+		productsByKey: map[string]Product{},
+		itemByScope:   map[string]int{},
+		outbox:        notify.New(notify.NewInMemorySender()),
+	}
 }
 
 func (s *Service) Me() User { return s.user }
@@ -73,48 +120,98 @@ func (s *Service) ListAlerts() []Alert {
 	return out
 }
 
+func (s *Service) ListNotifications(unreadOnly bool, limit int) []Notification {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 50
+	}
+	out := make([]Notification, 0, min(len(s.notifications), limit))
+	for _, n := range s.notifications {
+		if unreadOnly && n.Read {
+			continue
+		}
+		out = append(out, n)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func (s *Service) NotificationPreferences() NotificationPreferences {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.prefs
+}
+
+func (s *Service) UpdateNotificationPreferences(p NotificationPreferences) NotificationPreferences {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prefs = p
+	return s.prefs
+}
+
+func (s *Service) MarkNotificationRead(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for i := range s.notifications {
+		if s.notifications[i].ID == id {
+			if !s.notifications[i].Read {
+				s.notifications[i].Read = true
+				s.notifications[i].ReadAt = &now
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) MarkAllNotificationsRead() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	count := 0
+	for i := range s.notifications {
+		if s.notifications[i].Read {
+			continue
+		}
+		s.notifications[i].Read = true
+		s.notifications[i].ReadAt = &now
+		count++
+	}
+	return count
+}
+
 func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (TrackedItem, error) {
 	res, err := s.checker.CheckURL(ctx, req.URL, req.Country, req.ZIP)
 	if err != nil {
 		return TrackedItem{}, err
 	}
-	now := time.Now().UTC()
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.seq++
-	id := makeID("item", s.seq)
-	item := TrackedItem{
-		ID:                 id,
-		UserID:             s.user.ID,
-		URL:                req.URL,
-		Country:            req.Country,
-		ZIP:                req.ZIP,
-		CreatedAt:          now,
-		LastCheckedAt:      res.CheckedAt,
-		LastPriceUSD:       res.PriceUSD,
-		FreeShipping:       res.FreeShipping,
-		FreeShippingStrict: res.FreeShippingCountry,
-		Signal:             res.Signal,
-		Method:             res.Method,
-	}
-	s.items = append([]TrackedItem{item}, s.items...)
-	if len(s.items) > 100 {
-		s.items = s.items[:100]
-	}
-
-	s.seq++
-	alert := Alert{ID: makeID("alert", s.seq), UserID: s.user.ID, CreatedAt: now}
-	if item.FreeShippingStrict {
-		alert.Message = "✅ Tracked item added: free shipping for destination"
-	} else {
-		alert.Message = "ℹ️ Tracked item added: not free shipping for destination"
-	}
-	s.alerts = append([]Alert{alert}, s.alerts...)
-	if len(s.alerts) > 100 {
-		s.alerts = s.alerts[:100]
+	item, alert, queueNotification := s.addTrackedItemFromResult(req, res)
+	if queueNotification {
+		_, _ = s.outbox.DispatchDue(ctx, time.Now().UTC(), 25)
+		for _, entry := range s.outbox.Entries() {
+			if entry.AlertID != alert.ID || entry.Status != notify.StatusDelivered {
+				continue
+			}
+			s.mu.Lock()
+			s.seq++
+			n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, Title: "Tracking updated", Message: alert.Message, Read: false, CreatedAt: time.Now().UTC()}
+			s.notifications = append([]Notification{n}, s.notifications...)
+			if len(s.notifications) > 200 {
+				s.notifications = s.notifications[:200]
+			}
+			s.mu.Unlock()
+			break
+		}
 	}
 	return item, nil
+}
+
+func (s *Service) RetryFailedNotifications(ctx context.Context, limit int) (int, error) {
+	return s.outbox.DispatchDue(ctx, time.Now().UTC(), limit)
 }
 
 func (s *Service) UserCounts() admin.UserStats {
@@ -138,4 +235,11 @@ func fmtInt(i int) string {
 		i /= 10
 	}
 	return string(buf[bp:])
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
