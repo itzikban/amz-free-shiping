@@ -26,6 +26,15 @@ export default function NeuralBackdrop() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const isReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (isReducedMotion) {
+      canvas.style.background = "linear-gradient(135deg, #0a0a1a, #0d1117)";
+      return;
+    }
+
+    const isMobile = window.innerWidth < 600 || "ontouchstart" in window;
+    const nodeCount = isMobile ? 30 : NODE_COUNT;
+
     let w = 0;
     let h = 0;
     let animId = 0;
@@ -33,7 +42,7 @@ export default function NeuralBackdrop() {
     let nodes: Node[] = [];
 
     function resize() {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 2);
       w = window.innerWidth;
       h = window.innerHeight;
       canvas!.width = w * dpr;
@@ -45,7 +54,7 @@ export default function NeuralBackdrop() {
 
     function createNodes() {
       nodes = [];
-      for (let i = 0; i < NODE_COUNT; i++) {
+      for (let i = 0; i < nodeCount; i++) {
         nodes.push({
           x: Math.random() * w,
           y: Math.random() * h,

@@ -61,6 +61,7 @@ export default function HomePage() {
 
   async function addToWatchlist() {
     if (!submittedForm || addingWatchlist) return;
+    setError(null);
     setAddingWatchlist(true);
     setWatchlistAdded(false);
     try {

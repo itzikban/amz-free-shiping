@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-type Lang = "en" | "he";
+export type Lang = "en" | "he";
 
 const dictionaries = {
   en: {
@@ -233,15 +233,13 @@ type I18nContextType = {
 
 const I18nContext = createContext<I18nContextType | null>(null);
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
-  const [mounted, setMounted] = useState(false);
+export function I18nProvider({ children, initialLang }: { children: React.ReactNode; initialLang?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(initialLang ?? "en");
 
   useEffect(() => {
-    const next: Lang = localStorage.getItem("ui_lang") === "he" ? "he" : "en";
-    setLangState(next);
-    setMounted(true);
-  }, []);
+    const stored: Lang = localStorage.getItem("ui_lang") === "he" ? "he" : "en";
+    if (stored !== lang) setLangState(stored);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const dir = lang === "he" ? "rtl" : "ltr";
@@ -252,6 +250,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const setLang = useCallback((next: Lang) => {
     setLangState(next);
     localStorage.setItem("ui_lang", next);
+    document.cookie = "ui_lang=" + next + ";path=/;max-age=31536000;SameSite=Lax";
   }, []);
 
   const value = useMemo<I18nContextType>(() => {
@@ -273,9 +272,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <I18nContext.Provider value={value}>
-      <div suppressHydrationWarning style={mounted ? undefined : { visibility: "hidden" }}>
-        {children}
-      </div>
+      {children}
     </I18nContext.Provider>
   );
 }

@@ -313,6 +313,14 @@ h4 { margin: 0 0 8px; }
 .priceTag { font-size: 1.45rem; font-weight: 800; }
 .targetActions { display: flex; gap: 10px; margin-top: 10px; }
 
+@media (max-width: 640px) {
+  .targetMeta,
+  .targetActions {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+
 .flowHint { display:flex; justify-content:center; margin: 10px 0; }
 .flowHint span {
   border: 1px solid var(--line);
@@ -355,6 +363,11 @@ h4 { margin: 0 0 8px; }
   * { animation: none !important; transition: none !important; }
 }
 
+.search-container:focus-within {
+  border-color: color-mix(in srgb, var(--brand-a) 45%, white);
+  box-shadow: 0 0 0 3px rgba(33, 212, 253, 0.14);
+}
+
 .search-container input.clean-input,
 .search-container select.clean-input {
   border: none;
@@ -363,4 +376,11 @@ h4 { margin: 0 0 8px; }
   outline: none;
   width: 100%;
   padding: 8px 4px;
+}
+
+.search-container input.clean-input:focus-visible,
+.search-container select.clean-input:focus-visible,
+.analyzeBtn:focus-visible {
+  outline: 2px solid var(--brand-a);
+  outline-offset: 2px;
 }
