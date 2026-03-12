@@ -77,8 +77,7 @@ type AddTrackedItemReq struct {
 }
 
 const (
-	maxAlertMessageEntries      = 1000
-	maxNotificationIndexEntries = 2000
+	maxAlertMessageEntries = 1000
 )
 
 type Service struct {
@@ -244,7 +243,6 @@ func (s *Service) addTrackedItemFromResult(ctx context.Context, req AddTrackedIt
 		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, alert.Message, key, now)
 	}
 	s.mu.Unlock()
-	_ = ctx
 	return item
 }
 
@@ -340,11 +338,6 @@ func (s *Service) rememberNotificationIndex(alertID string) {
 	}
 	s.notificationIndex[alertID] = struct{}{}
 	s.notificationOrder = append(s.notificationOrder, alertID)
-	for len(s.notificationOrder) > maxNotificationIndexEntries {
-		drop := s.notificationOrder[0]
-		s.notificationOrder = s.notificationOrder[1:]
-		delete(s.notificationIndex, drop)
-	}
 }
 
 func (s *Service) rememberAlertMessage(alertID, message string) {

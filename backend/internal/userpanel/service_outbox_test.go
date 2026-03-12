@@ -48,21 +48,18 @@ func TestTransitionNotFreeToFree_CreatesTransitionAlertAndNotification(t *testin
 	t.Fatalf("expected notification for transition alert %s, got %+v", transitionAlertID, notifs)
 }
 
-func TestRememberNotificationIndex_Bounded(t *testing.T) {
+func TestRememberNotificationIndex_PreservesOldEntries(t *testing.T) {
 	svc := New(nil)
 
-	for i := 0; i < maxNotificationIndexEntries+10; i++ {
+	for i := 0; i < 2010; i++ {
 		svc.rememberNotificationIndex("alert-" + fmtInt(i))
 	}
 
-	if got := len(svc.notificationOrder); got != maxNotificationIndexEntries {
-		t.Fatalf("expected notificationOrder to be capped at %d, got %d", maxNotificationIndexEntries, got)
+	if _, exists := svc.notificationIndex["alert-0"]; !exists {
+		t.Fatalf("expected oldest index entry to remain for outbox replay dedupe")
 	}
-	if got := len(svc.notificationIndex); got != maxNotificationIndexEntries {
-		t.Fatalf("expected notificationIndex to be capped at %d, got %d", maxNotificationIndexEntries, got)
-	}
-	if _, exists := svc.notificationIndex["alert-0"]; exists {
-		t.Fatalf("expected oldest index entry to be evicted")
+	if got := len(svc.notificationOrder); got != 2010 {
+		t.Fatalf("expected notificationOrder to keep all entries, got %d", got)
 	}
 }
 
