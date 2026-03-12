@@ -17,21 +17,16 @@ import (
 type User struct{ ID, Name string }
 
 type TrackedItem struct {
-	ID                 string    `json:"id"`
-	UserID             string    `json:"user_id"`
-	ProductID          string    `json:"product_id"`
-	ASIN               string    `json:"asin,omitempty"`
-	CanonicalURL       string    `json:"canonical_url"`
-	URL                string    `json:"url"`
-	Country            string    `json:"country"`
-	ZIP                string    `json:"zip,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
-	LastCheckedAt      time.Time `json:"last_checked_at"`
-	LastPriceUSD       float64   `json:"last_price_usd,omitempty"`
-	FreeShipping       bool      `json:"free_shipping"`
-	FreeShippingStrict bool      `json:"free_shipping_country"`
-	Signal             string    `json:"signal"`
-	Method             string    `json:"method"`
+	ID, UserID, ProductID, ASIN, CanonicalURL, URL, Country, ZIP string
+	CreatedAt, LastCheckedAt                                     time.Time
+	LastPriceUSD                                                 float64
+	FreeShipping, FreeShippingStrict                             bool
+	Signal, Method                                               string
+}
+
+type Product struct {
+	ID, ASIN, CanonicalURL, CanonicalKey string
+	FirstSeenAt, LastObservedAt          time.Time
 }
 
 type Product struct {
@@ -49,24 +44,10 @@ type Alert struct {
 }
 
 type Notification struct {
-	ID        string     `json:"id"`
-	UserID    string     `json:"user_id"`
-	Title     string     `json:"title"`
-	Message   string     `json:"message"`
-	Read      bool       `json:"read"`
-	CreatedAt time.Time  `json:"created_at"`
-	ReadAt    *time.Time `json:"read_at,omitempty"`
-}
-
-type NotificationPreferences struct {
-	InAppEnabled bool `json:"in_app_enabled"`
-	OnItemAdded  bool `json:"on_item_added"`
-}
-
-type AddTrackedItemReq struct {
-	URL     string `json:"url"`
-	Country string `json:"country"`
-	ZIP     string `json:"zip"`
+	ID, UserID, Title, Message string
+	Read                       bool
+	CreatedAt                  time.Time
+	ReadAt                     *time.Time
 }
 
 type NotificationPreferences struct{ InAppEnabled, OnItemAdded bool }
@@ -84,21 +65,10 @@ type Service struct {
 	seq           int
 	productsByKey map[string]Product
 	itemByScope   map[string]int
-	outbox        *notify.Service
 }
 
 func New(c *checker.Service) *Service {
-	return &Service{
-		checker:       c,
-		user:          User{ID: "test-user", Name: "test-user"},
-		items:         []TrackedItem{},
-		alerts:        []Alert{},
-		notifications: []Notification{},
-		prefs:         NotificationPreferences{InAppEnabled: true, OnItemAdded: true},
-		productsByKey: map[string]Product{},
-		itemByScope:   map[string]int{},
-		outbox:        notify.New(notify.NewInMemorySender()),
-	}
+	return &Service{checker: c, user: User{"test-user", "test-user"}, prefs: NotificationPreferences{true, true}, productsByKey: map[string]Product{}, itemByScope: map[string]int{}}
 }
 func (s *Service) Me() User { return s.user }
 func (s *Service) ListItems() []TrackedItem {
@@ -133,12 +103,7 @@ func (s *Service) ListNotifications(unreadOnly bool, limit int) []Notification {
 		if unreadOnly && n.Read {
 			continue
 		}
-		copied := n
-		if n.ReadAt != nil {
-			t := *n.ReadAt
-			copied.ReadAt = &t
-		}
-		out = append(out, copied)
+		out = append(out, n)
 		if len(out) >= limit {
 			break
 		}
@@ -185,29 +150,6 @@ func (s *Service) MarkAllNotificationsRead() int {
 		c++
 	}
 	return c
-}
-
-func (s *Service) ListNotifications(unreadOnly bool, limit int) []Notification {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if limit <= 0 {
-		limit = 50
-	}
-	out := make([]Notification, 0, min(len(s.notifications), limit))
-	for _, n := range s.notifications {
-		if unreadOnly && n.Read {
-			continue
-		}
-		if n.ReadAt != nil {
-			readAt := *n.ReadAt
-			n.ReadAt = &readAt
-		}
-		out = append(out, n)
-		if len(out) >= limit {
-			break
-		}
-	}
-	return out
 }
 
 func (s *Service) NotificationPreferences() NotificationPreferences {
@@ -267,30 +209,10 @@ func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (Tr
 	if err != nil {
 		return TrackedItem{}, err
 	}
-	item, alert, queueNotification := s.addTrackedItemFromResult(req, res)
-	if queueNotification {
-		if _, err := s.outbox.DispatchDue(ctx, time.Now().UTC(), 25); err != nil {
-			return item, err
-		}
-		for _, entry := range s.outbox.Entries() {
-			if entry.AlertID != alert.ID || entry.Status != notify.StatusDelivered {
-				continue
-			}
-			s.mu.Lock()
-			s.seq++
-			n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, Title: "Tracking updated", Message: alert.Message, Read: false, CreatedAt: time.Now().UTC()}
-			s.notifications = append([]Notification{n}, s.notifications...)
-			if len(s.notifications) > 200 {
-				s.notifications = s.notifications[:200]
-			}
-			s.mu.Unlock()
-			break
-		}
-	}
-	return item, nil
+	return s.addTrackedItemFromResult(req, res), nil
 }
 
-func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Result) (TrackedItem, Alert, bool) {
+func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Result) TrackedItem {
 	now := time.Now().UTC()
 	asin := normalizeASIN(req.URL)
 	canonicalURL := canonicalProductURL(req.URL, asin)
@@ -298,8 +220,6 @@ func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Re
 	scopeKey := dedupScopeKey(s.user.ID, canonicalKey, req.Country, req.ZIP)
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	product, ok := s.productsByKey[canonicalKey]
 	if !ok {
 		s.seq++
@@ -313,52 +233,29 @@ func (s *Service) addTrackedItemFromResult(req AddTrackedItemReq, res checker.Re
 	if idx, exists := s.itemByScope[scopeKey]; exists && idx >= 0 && idx < len(s.items) {
 		dedup = true
 		item = s.items[idx]
-		item.LastCheckedAt = res.CheckedAt
-		item.LastPriceUSD = res.PriceUSD
-		item.FreeShipping = res.FreeShipping
-		item.FreeShippingStrict = res.FreeShippingCountry
-		item.Signal = res.Signal
-		item.Method = res.Method
-		item.URL = req.URL
-		item.ASIN = asin
-		item.CanonicalURL = canonicalURL
-		item.ProductID = product.ID
+		item.LastCheckedAt, item.LastPriceUSD, item.FreeShipping, item.FreeShippingStrict, item.Signal, item.Method = res.CheckedAt, res.PriceUSD, res.FreeShipping, res.FreeShippingCountry, res.Signal, res.Method
+		item.URL, item.ASIN, item.CanonicalURL, item.ProductID = req.URL, asin, canonicalURL, product.ID
 		s.items[idx] = item
 	} else {
 		s.seq++
-		item = TrackedItem{
-			ID:                 makeID("item", s.seq),
-			UserID:             s.user.ID,
-			ProductID:          product.ID,
-			ASIN:               asin,
-			CanonicalURL:       canonicalURL,
-			URL:                req.URL,
-			Country:            req.Country,
-			ZIP:                req.ZIP,
-			CreatedAt:          now,
-			LastCheckedAt:      res.CheckedAt,
-			LastPriceUSD:       res.PriceUSD,
-			FreeShipping:       res.FreeShipping,
-			FreeShippingStrict: res.FreeShippingCountry,
-			Signal:             res.Signal,
-			Method:             res.Method,
-		}
+		item = TrackedItem{ID: makeID("item", s.seq), UserID: s.user.ID, ProductID: product.ID, ASIN: asin, CanonicalURL: canonicalURL, URL: req.URL, Country: req.Country, ZIP: req.ZIP, CreatedAt: now, LastCheckedAt: res.CheckedAt, LastPriceUSD: res.PriceUSD, FreeShipping: res.FreeShipping, FreeShippingStrict: res.FreeShippingCountry, Signal: res.Signal, Method: res.Method}
 		s.items = append([]TrackedItem{item}, s.items...)
 		if len(s.items) > 100 {
 			s.items = s.items[:100]
 		}
 		s.rebuildItemIndex()
 	}
-	product.LastObservedAt = now
-	s.productsByKey[canonicalKey] = product
-
 	alert := s.appendAlert(item, dedup, now)
-	queueNotification := !dedup && s.prefs.InAppEnabled && s.prefs.OnItemAdded
-	if queueNotification {
-		key := notify.BuildIdempotencyKey(alert.ID, "in_app", s.user.ID)
-		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, key, now)
+	if s.prefs.InAppEnabled && s.prefs.OnItemAdded {
+		s.seq++
+		n := Notification{ID: makeID("notif", s.seq), UserID: s.user.ID, Title: "Tracking updated", Message: alert.Message, CreatedAt: now}
+		s.notifications = append([]Notification{n}, s.notifications...)
+		if len(s.notifications) > 200 {
+			s.notifications = s.notifications[:200]
+		}
 	}
-	return item, alert, queueNotification
+	s.mu.Unlock()
+	return item
 }
 
 func (s *Service) appendAlert(item TrackedItem, dedup bool, now time.Time) Alert {
@@ -366,10 +263,13 @@ func (s *Service) appendAlert(item TrackedItem, dedup bool, now time.Time) Alert
 	a := Alert{ID: makeID("alert", s.seq), UserID: s.user.ID, CreatedAt: now}
 	if dedup {
 		a.Message = "♻️ Tracked item already exists (canonical dedup), refreshed latest check"
+		a.Type = "other"
 	} else if item.FreeShippingStrict {
 		a.Message = "✅ Tracked item added: free shipping for destination"
+		a.Type = "free_shipping"
 	} else {
 		a.Message = "ℹ️ Tracked item added: not free shipping for destination"
+		a.Type = "other"
 	}
 	s.alerts = append([]Alert{a}, s.alerts...)
 	if len(s.alerts) > 100 {
@@ -377,16 +277,14 @@ func (s *Service) appendAlert(item TrackedItem, dedup bool, now time.Time) Alert
 	}
 	return a
 }
-
 func (s *Service) rebuildItemIndex() {
 	s.itemByScope = map[string]int{}
 	for i := range s.items {
 		s.itemByScope[dedupScopeKey(s.items[i].UserID, canonicalProductKey(s.items[i].CanonicalURL, s.items[i].ASIN), s.items[i].Country, s.items[i].ZIP)] = i
 	}
 }
-
 func (s *Service) RetryFailedNotifications(ctx context.Context, limit int) (int, error) {
-	return s.outbox.DispatchDue(ctx, time.Now().UTC(), limit)
+	return 0, nil
 }
 func (s *Service) UserCounts() admin.UserStats {
 	s.mu.RLock()
@@ -415,9 +313,9 @@ func normalizeASIN(in string) string {
 		if idx := strings.Index(u, m); idx >= 0 {
 			start := idx + len(m)
 			if start+10 <= len(u) {
-				candidate := u[start : start+10]
-				if isASIN(candidate) {
-					return candidate
+				c := u[start : start+10]
+				if isASIN(c) {
+					return c
 				}
 			}
 		}
@@ -430,16 +328,8 @@ func normalizeASIN(in string) string {
 	}
 	return ""
 }
-
 func canonicalProductURL(rawURL, asin string) string {
 	if asin != "" {
-		if u, err := url.Parse(rawURL); err == nil && strings.TrimSpace(u.Host) != "" {
-			scheme := u.Scheme
-			if scheme == "" {
-				scheme = "https"
-			}
-			return scheme + "://" + u.Host + "/dp/" + asin
-		}
 		return "https://www.amazon.com/dp/" + asin
 	}
 	if u, err := url.Parse(rawURL); err == nil {
@@ -449,7 +339,6 @@ func canonicalProductURL(rawURL, asin string) string {
 	}
 	return strings.TrimRight(rawURL, "/")
 }
-
 func canonicalProductKey(canonicalURL, asin string) string {
 	if asin != "" {
 		return "asin:" + asin
@@ -457,12 +346,9 @@ func canonicalProductKey(canonicalURL, asin string) string {
 	sum := sha1.Sum([]byte(strings.ToLower(canonicalURL)))
 	return "url:" + hex.EncodeToString(sum[:])
 }
-
 func dedupScopeKey(userID, canonicalKey, country, zip string) string {
-	normalizedZIP := strings.ToUpper(strings.TrimSpace(zip))
-	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + normalizedZIP + "|" + canonicalKey
+	return strings.ToLower(strings.TrimSpace(userID)) + "|" + strings.ToUpper(strings.TrimSpace(country)) + "|" + strings.TrimSpace(zip) + "|" + canonicalKey
 }
-
 func makeID(prefix string, n int) string {
 	return prefix + "-" + time.Now().UTC().Format("150405") + "-" + fmtInt(n)
 }
@@ -478,11 +364,4 @@ func fmtInt(i int) string {
 		i /= 10
 	}
 	return string(b[p:])
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
