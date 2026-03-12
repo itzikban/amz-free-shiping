@@ -19,6 +19,10 @@ func TestNotificationsReadAndPreferences(t *testing.T) {
 		t.Fatalf("AddTrackedItem failed: %v", err)
 	}
 
+	if _, err := svc.RetryFailedNotifications(context.Background(), 100); err != nil {
+		t.Fatalf("RetryFailedNotifications failed: %v", err)
+	}
+
 	notifs := svc.ListNotifications(false, 10)
 	if len(notifs) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(notifs))

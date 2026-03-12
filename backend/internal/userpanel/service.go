@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
-	"log"
 	"net/url"
 	"strings"
 	"sync"
@@ -78,8 +77,7 @@ type AddTrackedItemReq struct {
 }
 
 const (
-	maxNotificationIndexEntries = 2000
-	maxAlertMessageEntries      = 1000
+	maxAlertMessageEntries = 1000
 )
 
 type Service struct {
@@ -240,21 +238,12 @@ func (s *Service) addTrackedItemFromResult(ctx context.Context, req AddTrackedIt
 		s.rebuildItemIndex()
 	}
 	alert := s.appendAlert(item, dedup, prevStrict, now)
-	enqueue := false
 	if s.prefs.InAppEnabled && s.prefs.OnItemAdded && s.outbox != nil {
 		key := notify.BuildIdempotencyKey(alert.ID, "in_app", s.user.ID)
 		s.outbox.Enqueue(alert.ID, "in_app", s.user.ID, alert.Message, key, now)
-		enqueue = true
 	}
 	s.mu.Unlock()
-
-	if enqueue {
-		now := time.Now().UTC()
-		if _, err := s.outbox.DispatchDue(ctx, now, 20); err != nil {
-			log.Printf("userpanel: dispatching due notifications failed: %v", err)
-		}
-		s.syncDeliveredNotifications(now)
-	}
+	_ = ctx
 	return item
 }
 
@@ -308,8 +297,10 @@ func (s *Service) syncDeliveredNotifications(now time.Time) {
 	if s.notificationIndex == nil {
 		s.notificationIndex = map[string]struct{}{}
 	}
-	for _, n := range s.notifications {
-		s.rememberNotificationIndex(n.AlertID)
+	if len(s.notificationOrder) == 0 {
+		for _, n := range s.notifications {
+			s.rememberNotificationIndex(n.AlertID)
+		}
 	}
 	for _, e := range entries {
 		if e.Status != notify.StatusDelivered || e.Channel != "in_app" {
@@ -348,11 +339,6 @@ func (s *Service) rememberNotificationIndex(alertID string) {
 	}
 	s.notificationIndex[alertID] = struct{}{}
 	s.notificationOrder = append(s.notificationOrder, alertID)
-	for len(s.notificationOrder) > maxNotificationIndexEntries {
-		drop := s.notificationOrder[0]
-		s.notificationOrder = s.notificationOrder[1:]
-		delete(s.notificationIndex, drop)
-	}
 }
 
 func (s *Service) rememberAlertMessage(alertID, message string) {
