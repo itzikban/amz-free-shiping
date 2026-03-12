@@ -13,36 +13,66 @@ import (
 	"free-ship-checker-go/internal/checker"
 )
 
-type User struct{ ID, Name string }
+type User struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
 
 type TrackedItem struct {
-	ID, UserID, ProductID, ASIN, CanonicalURL, URL, Country, ZIP string
-	CreatedAt, LastCheckedAt                                     time.Time
-	LastPriceUSD                                                 float64
-	FreeShipping, FreeShippingStrict                             bool
-	Signal, Method                                               string
+	ID                 string    `json:"id"`
+	UserID             string    `json:"user_id"`
+	ProductID          string    `json:"product_id"`
+	ASIN               string    `json:"asin,omitempty"`
+	CanonicalURL       string    `json:"canonical_url"`
+	URL                string    `json:"url"`
+	Country            string    `json:"country"`
+	ZIP                string    `json:"zip,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	LastCheckedAt      time.Time `json:"last_checked_at"`
+	LastPriceUSD       float64   `json:"last_price_usd,omitempty"`
+	FreeShipping       bool      `json:"free_shipping"`
+	FreeShippingStrict bool      `json:"free_shipping_country"`
+	Signal             string    `json:"signal"`
+	Method             string    `json:"method"`
 }
 
 type Product struct {
-	ID, ASIN, CanonicalURL, CanonicalKey string
-	FirstSeenAt, LastObservedAt          time.Time
+	ID             string    `json:"id"`
+	ASIN           string    `json:"asin,omitempty"`
+	CanonicalURL   string    `json:"canonical_url"`
+	CanonicalKey   string    `json:"canonical_key"`
+	FirstSeenAt    time.Time `json:"first_seen_at"`
+	LastObservedAt time.Time `json:"last_observed_at"`
 }
 
 type Alert struct {
-	ID, UserID, Message, Type string
-	CreatedAt                 time.Time
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Message   string    `json:"message"`
+	Type      string    `json:"type"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Notification struct {
-	ID, UserID, Title, Message string
-	Read                       bool
-	CreatedAt                  time.Time
-	ReadAt                     *time.Time
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Title     string     `json:"title"`
+	Message   string     `json:"message"`
+	Read      bool       `json:"read"`
+	CreatedAt time.Time  `json:"created_at"`
+	ReadAt    *time.Time `json:"read_at,omitempty"`
 }
 
-type NotificationPreferences struct{ InAppEnabled, OnItemAdded bool }
+type NotificationPreferences struct {
+	InAppEnabled bool `json:"in_app_enabled"`
+	OnItemAdded  bool `json:"on_item_added"`
+}
 
-type AddTrackedItemReq struct{ URL, Country, ZIP string }
+type AddTrackedItemReq struct {
+	URL     string `json:"url"`
+	Country string `json:"country"`
+	ZIP     string `json:"zip"`
+}
 
 type Service struct {
 	checker       *checker.Service
