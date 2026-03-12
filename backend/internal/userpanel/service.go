@@ -11,7 +11,6 @@ import (
 
 	"free-ship-checker-go/internal/admin"
 	"free-ship-checker-go/internal/checker"
-	"free-ship-checker-go/internal/notify"
 )
 
 type User struct{ ID, Name string }
@@ -27,15 +26,6 @@ type TrackedItem struct {
 type Product struct {
 	ID, ASIN, CanonicalURL, CanonicalKey string
 	FirstSeenAt, LastObservedAt          time.Time
-}
-
-type Product struct {
-	ID             string    `json:"id"`
-	ASIN           string    `json:"asin,omitempty"`
-	CanonicalURL   string    `json:"canonical_url"`
-	CanonicalKey   string    `json:"canonical_key"`
-	FirstSeenAt    time.Time `json:"first_seen_at"`
-	LastObservedAt time.Time `json:"last_observed_at"`
 }
 
 type Alert struct {
@@ -152,59 +142,7 @@ func (s *Service) MarkAllNotificationsRead() int {
 	return c
 }
 
-func (s *Service) NotificationPreferences() NotificationPreferences {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.prefs
-}
-
-func (s *Service) UpdateNotificationPreferences(p NotificationPreferences) NotificationPreferences {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.prefs = p
-	return s.prefs
-}
-
-func (s *Service) MarkNotificationRead(id string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().UTC()
-	for i := range s.notifications {
-		if s.notifications[i].ID == id {
-			if !s.notifications[i].Read {
-				s.notifications[i].Read = true
-				s.notifications[i].ReadAt = &now
-			}
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Service) MarkAllNotificationsRead() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now().UTC()
-	count := 0
-	for i := range s.notifications {
-		if s.notifications[i].Read {
-			continue
-		}
-		s.notifications[i].Read = true
-		s.notifications[i].ReadAt = &now
-		count++
-	}
-	return count
-}
-
 func (s *Service) AddTrackedItem(ctx context.Context, req AddTrackedItemReq) (TrackedItem, error) {
-	raw := strings.TrimSpace(req.URL)
-	if asin := strings.ToUpper(raw); isASIN(asin) {
-		req.URL = "https://www.amazon.com/dp/" + asin
-	} else {
-		req.URL = raw
-	}
-
 	res, err := s.checker.CheckURL(ctx, req.URL, req.Country, req.ZIP)
 	if err != nil {
 		return TrackedItem{}, err
