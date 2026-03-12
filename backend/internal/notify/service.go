@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"sync"
 	"time"
 )
@@ -72,7 +73,7 @@ func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (in
 		limit = len(s.entries)
 	}
 	processed := 0
-	var firstErr error
+	var errs []error
 	for i := range s.entries {
 		if processed >= limit {
 			break
@@ -82,9 +83,7 @@ func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (in
 		}
 		if err := s.sender.Send(ctx, s.entries[i]); err != nil {
 			s.entries[i].Status = StatusFailed
-			if firstErr == nil {
-				firstErr = err
-			}
+			errs = append(errs, err)
 			continue
 		}
 		t := now.UTC()
@@ -92,7 +91,7 @@ func (s *Service) DispatchDue(ctx context.Context, now time.Time, limit int) (in
 		s.entries[i].SentAt = &t
 		processed++
 	}
-	return processed, firstErr
+	return processed, errors.Join(errs...)
 }
 
 func (s *Service) Entries() []Entry {
