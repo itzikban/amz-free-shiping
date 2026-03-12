@@ -358,6 +358,13 @@ func normalizeASIN(in string) string {
 
 func canonicalProductURL(rawURL, asin string) string {
 	if asin != "" {
+		if u, err := url.Parse(rawURL); err == nil && strings.TrimSpace(u.Host) != "" {
+			scheme := u.Scheme
+			if scheme == "" {
+				scheme = "https"
+			}
+			return scheme + "://" + u.Host + "/dp/" + asin
+		}
 		return "https://www.amazon.com/dp/" + asin
 	}
 	if u, err := url.Parse(rawURL); err == nil {

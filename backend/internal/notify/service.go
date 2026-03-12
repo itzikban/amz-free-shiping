@@ -50,6 +50,11 @@ func New(sender Sender) *Service {
 func (s *Service) Enqueue(alertID, channel, address, idempotencyKey string, now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	for _, e := range s.entries {
+		if e.IdempotencyKey == idempotencyKey {
+			return
+		}
+	}
 	s.entries = append(s.entries, Entry{
 		AlertID:        alertID,
 		Channel:        channel,
