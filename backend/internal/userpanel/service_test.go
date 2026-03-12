@@ -1,6 +1,7 @@
 package userpanel
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -30,8 +31,8 @@ func TestCanonicalDedupByASINAndScope(t *testing.T) {
 	res1 := checker.Result{CheckedAt: time.Now().UTC(), FreeShippingCountry: true, FreeShipping: true, Signal: "signal-1", Method: "mock"}
 	res2 := checker.Result{CheckedAt: time.Now().UTC().Add(1 * time.Minute), FreeShippingCountry: false, FreeShipping: false, Signal: "signal-2", Method: "mock"}
 
-	item1 := svc.addTrackedItemFromResult(AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7?ref=123", Country: "US", ZIP: "10013"}, res1)
-	item2 := svc.addTrackedItemFromResult(AddTrackedItemReq{URL: "https://www.amazon.com/gp/product/b0dhczbkw7", Country: "US", ZIP: "10013"}, res2)
+	item1 := svc.addTrackedItemFromResult(context.Background(), AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7?ref=123", Country: "US", ZIP: "10013"}, res1)
+	item2 := svc.addTrackedItemFromResult(context.Background(), AddTrackedItemReq{URL: "https://www.amazon.com/gp/product/b0dhczbkw7", Country: "US", ZIP: "10013"}, res2)
 
 	if item1.ID != item2.ID {
 		t.Fatalf("expected deduped tracked item, got different IDs: %s vs %s", item1.ID, item2.ID)
@@ -54,9 +55,9 @@ func TestCanonicalDedupRespectsCountryZipScope(t *testing.T) {
 	svc := New(nil)
 	res := checker.Result{CheckedAt: time.Now().UTC(), FreeShippingCountry: true, FreeShipping: true, Signal: "signal", Method: "mock"}
 
-	_ = svc.addTrackedItemFromResult(AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "US", ZIP: "10013"}, res)
-	_ = svc.addTrackedItemFromResult(AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "US", ZIP: "90210"}, res)
-	_ = svc.addTrackedItemFromResult(AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "IL"}, res)
+	_ = svc.addTrackedItemFromResult(context.Background(), AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "US", ZIP: "10013"}, res)
+	_ = svc.addTrackedItemFromResult(context.Background(), AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "US", ZIP: "90210"}, res)
+	_ = svc.addTrackedItemFromResult(context.Background(), AddTrackedItemReq{URL: "https://www.amazon.com/dp/B0DHCZBKW7", Country: "IL"}, res)
 
 	if got := len(svc.ListItems()); got != 3 {
 		t.Fatalf("expected 3 scoped tracked items, got %d", got)

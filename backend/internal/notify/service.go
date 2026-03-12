@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,6 +20,7 @@ type Entry struct {
 	AlertID        string     `json:"alert_id"`
 	Channel        string     `json:"channel"`
 	Address        string     `json:"address"`
+	Message        string     `json:"message,omitempty"`
 	IdempotencyKey string     `json:"idempotency_key"`
 	Status         string     `json:"status"`
 	Attempts       int        `json:"attempts"`
@@ -50,7 +52,7 @@ func New(sender Sender) *Service {
 	return &Service{sender: sender, entries: make([]Entry, 0)}
 }
 
-func (s *Service) Enqueue(alertID, channel, address, idempotencyKey string, now time.Time) {
+func (s *Service) Enqueue(alertID, channel, address, message, idempotencyKey string, now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, e := range s.entries {
@@ -61,12 +63,16 @@ func (s *Service) Enqueue(alertID, channel, address, idempotencyKey string, now 
 			s.entries[i].Status = StatusPending
 			s.entries[i].NextAttemptAt = nil
 		}
+		if strings.TrimSpace(s.entries[i].Message) == "" && strings.TrimSpace(message) != "" {
+			s.entries[i].Message = message
+		}
 		return
 	}
 	s.entries = append(s.entries, Entry{
 		AlertID:        alertID,
 		Channel:        channel,
 		Address:        address,
+		Message:        message,
 		IdempotencyKey: idempotencyKey,
 		Status:         StatusPending,
 		CreatedAt:      now,
