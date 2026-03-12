@@ -14,7 +14,7 @@ type Metrics = {
 };
 
 export default function AdminPage() {
-  const { formatDate } = useI18n();
+  const { t, formatDate } = useI18n();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [msg, setMsg] = useState<string>("");
   const [metricsError, setMetricsError] = useState<string>("");
@@ -34,7 +34,7 @@ export default function AdminPage() {
         const body = await res.json().catch(() => ({}));
         if (seq === reqSeq.current) {
           setMetrics(null);
-          setMetricsError(body?.error || 'Failed to load metrics');
+          setMetricsError(body?.error || t('admin_failed_load_metrics'));
           setAuthRequired(res.status === 401 || res.status === 403);
         }
         return;
@@ -48,7 +48,7 @@ export default function AdminPage() {
     } catch {
       if (seq === reqSeq.current) {
         setMetrics(null);
-        setMetricsError('Network error while loading metrics');
+        setMetricsError(t('admin_network_load_metrics'));
         setAuthRequired(false);
       }
     }
@@ -68,7 +68,7 @@ export default function AdminPage() {
         setLoginMsg(body?.error || `login_failed_${res.status}`);
         return;
       }
-      setLoginMsg('login_ok');
+      setLoginMsg(t('common_yes'));
       await refresh();
     } catch (err) {
       setLoginMsg(err instanceof Error ? err.message : 'network_error');
@@ -87,9 +87,9 @@ export default function AdminPage() {
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setMsg(body?.message || body?.error || 'Action completed');
+      setMsg(body?.message || body?.error || t('admin_action_completed'));
     } catch {
-      setMsg('Network or parse error while running action');
+      setMsg(t('admin_network_action_error'));
     } finally {
       await refresh();
       setLoading(false);
@@ -110,46 +110,46 @@ export default function AdminPage() {
   return (
     <main className="container">
       <section className="card">
-        <h1>Admin Operations (ITZ-19)</h1>
-        <p className="mutedText">Backend metrics and operation actions.</p>
+        <h1>{t('admin_title')} (ITZ-19)</h1>
+        <p className="mutedText">{t('admin_subtitle')}</p>
       </section>
 
       <section className="card">
-        <h3>Metrics snapshot</h3>
+        <h3>{t('admin_metrics_snapshot')}</h3>
         {metricsError && <p className="mutedText">{metricsError}</p>}
         {authRequired && (
           <form className="row" style={{ marginBottom: 12 }} onSubmit={(e) => { e.preventDefault(); void login(); }}>
-            <input aria-label="Admin username" autoComplete="username" placeholder="admin username" value={username} onChange={(e) => setUsername(e.target.value)} />
-            <input aria-label="Admin password" autoComplete="current-password" placeholder="admin password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button type="submit" className="secondary" disabled={loggingIn}>{loggingIn ? 'Logging in...' : 'Login'}</button>
+            <input aria-label={t('admin_login_username')} autoComplete="username" placeholder={t('admin_login_username')} value={username} onChange={(e) => setUsername(e.target.value)} />
+            <input aria-label={t('admin_login_password')} autoComplete="current-password" placeholder={t('admin_login_password')} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button type="submit" className="secondary" disabled={loggingIn}>{loggingIn ? t('admin_logging_in') : t('admin_login_cta')}</button>
             {loginMsg && <span className="mutedText">{loginMsg}</span>}
           </form>
         )}
-        {!metrics && !metricsError && <p>Loading...</p>}
+        {!metrics && !metricsError && <p>{t('admin_loading')}</p>}
         {metrics && (
           <ul>
-            <li>Monitors total: {metrics.monitors_total}</li>
-            <li>Monitors running: {metrics.monitors_running}</li>
-            <li>Monitors stopped: {metrics.monitors_stopped}</li>
-            <li>Monitor notifications: {metrics.notifications}</li>
-            <li>User tracked items: {metrics.user_tracked_items}</li>
-            <li>User alerts: {metrics.user_alerts}</li>
-            <li>Generated: {formatDate(metrics.generated_at)}</li>
+            <li>{t('admin_monitors_total')}: {metrics.monitors_total}</li>
+            <li>{t('admin_monitors_running')}: {metrics.monitors_running}</li>
+            <li>{t('admin_monitors_stopped')}: {metrics.monitors_stopped}</li>
+            <li>{t('admin_monitor_notifications')}: {metrics.notifications}</li>
+            <li>{t('admin_user_tracked_items')}: {metrics.user_tracked_items}</li>
+            <li>{t('admin_user_alerts')}: {metrics.user_alerts}</li>
+            <li>{t('admin_generated')}: {formatDate(metrics.generated_at)}</li>
           </ul>
         )}
       </section>
 
       <section className="card">
-        <h3>Actions</h3>
+        <h3>{t('admin_actions')}</h3>
         <div className="row">
           <button className="secondary" disabled={loading} onClick={() => runAction('/api/v1/admin/actions/replay-failed-jobs')}>
-            Replay failed jobs
+            {t('admin_replay_failed_jobs')}
           </button>
           <button className="secondary" disabled={loading} onClick={() => runAction('/api/v1/admin/actions/retry-failed-notifications')}>
-            Retry failed notifications
+            {t('admin_retry_failed_notifications')}
           </button>
         </div>
-        {msg && <p className="mutedText">Result: {msg}</p>}
+        {msg && <p className="mutedText">{t('admin_result_prefix')}: {msg}</p>}
       </section>
     </main>
   );
