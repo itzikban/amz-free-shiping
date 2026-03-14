@@ -24,6 +24,7 @@ export default function AdminPage() {
   const [loginMsg, setLoginMsg] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
+  const [fetchMethod, setFetchMethod] = useState<"auto" | "http">("auto");
   const reqSeq = useRef(0);
 
   async function refresh() {
@@ -96,10 +97,34 @@ export default function AdminPage() {
     }
   }
 
+  async function loadFetchMethod() {
+    try {
+      const res = await fetch('/api/v1/admin/fetch-method');
+      if (res.ok) {
+        const body = await res.json();
+        setFetchMethod(body.method || 'auto');
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function saveFetchMethod(method: "auto" | "http") {
+    setFetchMethod(method);
+    try {
+      await fetch('/api/v1/admin/fetch-method', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ method }),
+      });
+    } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     let active = true;
     (async () => {
-      if (active) await refresh();
+      if (active) {
+        await refresh();
+        await loadFetchMethod();
+      }
     })();
     return () => {
       active = false;
@@ -137,6 +162,21 @@ export default function AdminPage() {
             <li>{t('admin_generated')}: {formatDate(metrics.generated_at)}</li>
           </ul>
         )}
+      </section>
+
+      <section className="card">
+        <h3>Fetch Method</h3>
+        <p className="mutedText">Controls how product pages are fetched. Auto uses premium proxy when available.</p>
+        <div className="fetchMethodToggle" style={{ justifyContent: 'flex-start', opacity: 1 }}>
+          <label>
+            <input type="radio" name="adminFetchMethod" value="auto" checked={fetchMethod === "auto"} onChange={() => saveFetchMethod("auto")} />
+            Auto (proxy + HTTP)
+          </label>
+          <label>
+            <input type="radio" name="adminFetchMethod" value="http" checked={fetchMethod === "http"} onChange={() => saveFetchMethod("http")} />
+            HTTP only
+          </label>
+        </div>
       </section>
 
       <section className="card">

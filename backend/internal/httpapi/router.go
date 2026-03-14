@@ -36,12 +36,11 @@ func NewRouter() http.Handler {
 		url := r.URL.Query().Get("url")
 		country := r.URL.Query().Get("country")
 		zip := r.URL.Query().Get("zip")
-		method := r.URL.Query().Get("method")
 		if url == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing url query param"})
 			return
 		}
-		res, err := svc.CheckURLWithMethod(r.Context(), url, country, zip, method)
+		res, err := svc.CheckURL(r.Context(), url, country, zip)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 			return
@@ -224,6 +223,37 @@ func NewRouter() http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusOK, usvc.UpdateNotificationPreferences(req))
+			return
+		}
+		methodNotAllowed(w, http.MethodGet, http.MethodPut)
+	})
+
+	mux.HandleFunc("/v1/admin/fetch-method", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAdmin(r, w) {
+			return
+		}
+		if r.Method == http.MethodGet {
+			m := svc.FetchMethod
+			if m == "" {
+				m = "auto"
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"method": m})
+			return
+		}
+		if r.Method == http.MethodPut {
+			var req struct {
+				Method string `json:"method"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
+				return
+			}
+			if req.Method != "auto" && req.Method != "http" {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "method must be 'auto' or 'http'"})
+				return
+			}
+			svc.FetchMethod = req.Method
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "method": req.Method})
 			return
 		}
 		methodNotAllowed(w, http.MethodGet, http.MethodPut)

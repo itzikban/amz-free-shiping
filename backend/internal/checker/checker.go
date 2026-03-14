@@ -27,7 +27,8 @@ type Result struct {
 }
 
 type Service struct {
-	Client *http.Client
+	Client      *http.Client
+	FetchMethod string // "auto" or "http"
 }
 
 var (
@@ -46,7 +47,7 @@ func New() *Service {
 }
 
 func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Result, error) {
-	return s.CheckURLWithMethod(ctx, url, country, zip, "")
+	return s.CheckURLWithMethod(ctx, url, country, zip, s.FetchMethod)
 }
 
 func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, method string) (Result, error) {
