@@ -95,28 +95,42 @@ kill_pidfile_if_exists() {
 kill_port() {
   local port="$1"
 
+  # Try lsof
   if have_cmd lsof; then
     local pids
     pids="$(lsof -ti tcp:"$port" 2>/dev/null || true)"
     if [[ -n "${pids:-}" ]]; then
-      log "Killing processes on port $port: $pids"
+      log "Killing processes on port $port (lsof): $pids"
       kill $pids 2>/dev/null || true
-      sleep 2
+      sleep 1
       pids="$(lsof -ti tcp:"$port" 2>/dev/null || true)"
-      if [[ -n "${pids:-}" ]]; then
-        log "Force killing remaining processes on port $port: $pids"
-        kill -9 $pids 2>/dev/null || true
-      fi
+      [[ -n "${pids:-}" ]] && kill -9 $pids 2>/dev/null || true
     fi
-  elif have_cmd fuser; then
+  fi
+
+  # Try fuser (works better on Linux)
+  if have_cmd fuser; then
     if fuser "$port/tcp" >/dev/null 2>&1; then
-      log "Killing processes on port $port via fuser"
+      log "Killing processes on port $port (fuser)"
       fuser -k "$port/tcp" >/dev/null 2>&1 || true
-      sleep 2
+      sleep 1
       fuser -k -9 "$port/tcp" >/dev/null 2>&1 || true
     fi
-  else
-    log "Warning: neither lsof nor fuser exists, cannot auto-kill port $port cleanly"
+  fi
+
+  # Try ss + kill as last resort
+  if have_cmd ss; then
+    local ss_pids
+    ss_pids="$(ss -tlnp "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' || true)"
+    if [[ -n "${ss_pids:-}" ]]; then
+      log "Killing processes on port $port (ss): $ss_pids"
+      kill -9 $ss_pids 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+
+  if ! have_cmd lsof && ! have_cmd fuser && ! have_cmd ss; then
+    log "Warning: no lsof/fuser/ss available, cannot auto-kill port $port"
   fi
 }
 
