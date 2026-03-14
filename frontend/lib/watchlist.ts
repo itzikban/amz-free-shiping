@@ -21,6 +21,8 @@ export type TrackedProduct = {
   free_shipping?: boolean;
   signal: string;
   method?: string;
+  title?: string;
+  image_url?: string;
 };
 
 export type UserAlert = {
