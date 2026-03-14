@@ -33,6 +33,9 @@ func loadDotenv(path string) {
 			os.Setenv(k, v)
 		}
 	}
+	if err := sc.Err(); err != nil {
+		log.Printf("warning: error reading %s: %v", path, err)
+	}
 }
 
 func main() {
