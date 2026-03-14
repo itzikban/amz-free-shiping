@@ -106,7 +106,7 @@ export default function ProductsPage() {
                 {it.image_url && (
                   <img className="watchlistThumb" src={it.image_url} alt={it.title || "Product"} />
                 )}
-                <div style={{flex: 1}}>
+                <div className="monitorItemBody">
                   {it.title && <strong className="watchlistTitle">{it.title}</strong>}
                   <div className="chipRow">
                     <span className={`signalPill ${it.free_shipping_country ? "ok" : "no"}`}>
