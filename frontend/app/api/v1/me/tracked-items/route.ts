@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
       cache: 'no-store',
-    });
+    }, 45000);
     return NextResponse.json(await res.json(), { status: res.status });
   } catch (err) {
     return NextResponse.json({ error: 'backend_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 });
