@@ -21,6 +21,7 @@ export default function HomePage() {
   const [submittedForm, setSubmittedForm] = useState<FormState | null>(null);
   const [addingWatchlist, setAddingWatchlist] = useState(false);
   const [watchlistAdded, setWatchlistAdded] = useState(false);
+  const [fetchMethod, setFetchMethod] = useState<"auto" | "http">("auto");
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -47,6 +48,7 @@ export default function HomePage() {
     try {
       const params = new URLSearchParams({ url: submitted.url, country: submitted.country });
       if (submitted.country === "US" && submitted.zip) params.set("zip", submitted.zip);
+      if (fetchMethod === "http") params.set("method", "http");
       const res = await fetch(`/api/check?${params.toString()}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");
@@ -144,6 +146,29 @@ export default function HomePage() {
             {loading ? t("loading") : t("home_analyze")}
           </button>
         </form>
+
+        <div className="fetchMethodToggle">
+          <label>
+            <input
+              type="radio"
+              name="fetchMethod"
+              value="auto"
+              checked={fetchMethod === "auto"}
+              onChange={() => setFetchMethod("auto")}
+            />
+            Decodo + HTTP
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="fetchMethod"
+              value="http"
+              checked={fetchMethod === "http"}
+              onChange={() => setFetchMethod("http")}
+            />
+            HTTP only
+          </label>
+        </div>
       </section>
 
       {(result || error) && (

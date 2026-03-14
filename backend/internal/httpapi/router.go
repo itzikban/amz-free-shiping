@@ -36,11 +36,12 @@ func NewRouter() http.Handler {
 		url := r.URL.Query().Get("url")
 		country := r.URL.Query().Get("country")
 		zip := r.URL.Query().Get("zip")
+		method := r.URL.Query().Get("method")
 		if url == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing url query param"})
 			return
 		}
-		res, err := svc.CheckURL(r.Context(), url, country, zip)
+		res, err := svc.CheckURLWithMethod(r.Context(), url, country, zip, method)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 			return

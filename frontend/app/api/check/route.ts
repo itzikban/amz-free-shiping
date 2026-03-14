@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
   const country = req.nextUrl.searchParams.get("country") || "US";
   const zip = req.nextUrl.searchParams.get("zip") || "";
+  const method = req.nextUrl.searchParams.get("method") || "";
 
   if (!url) {
     return NextResponse.json({ error: "missing url" }, { status: 400 });
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
   backendUrl.searchParams.set("url", url);
   backendUrl.searchParams.set("country", country);
   if (zip) backendUrl.searchParams.set("zip", zip);
+  if (method) backendUrl.searchParams.set("method", method);
 
   try {
     const res = await fetch(backendUrl, { method: "GET", cache: "no-store" });
