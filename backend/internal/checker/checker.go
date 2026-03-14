@@ -51,13 +51,12 @@ func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Resul
 }
 
 func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, method string) (Result, error) {
-	// 1. Try Decodo API first (preferred method)
+	// 1. Try Decodo API first (preferred method) — trust its result when it succeeds
 	if method != "http" {
 		if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
-			if dres.FreeShippingCountry {
-				return dres, nil
-			}
+			return dres, nil
 		}
+		// Decodo failed (API error, no auth, etc.) — fall through to HTTP/browser
 	}
 
 	// 2. Fallback: plain HTTP fetch
