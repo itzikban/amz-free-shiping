@@ -24,6 +24,7 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(1200px 500px at 10% -10%, rgba(33, 212, 253, 0.22), transparent 60%),
     radial-gradient(1000px 480px at 100% 0%, rgba(155, 92, 255, 0.2), transparent 60%),
@@ -270,9 +271,27 @@ h4 { margin: 0 0 8px; }
   .hero h1,
   .heroCenter h1 { font-size: 1.45rem; line-height: 1.15; }
   .heroCenter p { font-size: .95rem; }
-  .topNav { flex-direction: column; align-items: stretch; }
-  .topNavLinks { justify-content: flex-start; flex-wrap: wrap; row-gap: 8px; }
-  .topNav a { min-height: 44px; display: inline-flex; align-items: center; }
+
+  /* Nav: horizontal scroll-friendly, no column stack */
+  .topNav { gap: 8px; padding: 8px 12px; margin: 8px 8px 0; }
+  .topNavLinks { flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
+  .topNav a { min-height: 40px; display: inline-flex; align-items: center; font-size: .85rem; padding: 4px 8px; white-space: nowrap; }
+  .langSelect { font-size: .8rem; }
+  .langSelect select { min-width: 90px; padding: 5px 8px; font-size: .85rem; }
+
+  /* Container padding */
+  .container { padding: 16px 10px 40px; }
+
+  /* Watchlist items: stack vertically */
+  .monitorItem { flex-direction: column; align-items: flex-start; }
+  .watchlistTitle { white-space: normal; max-width: 100%; }
+
+  /* Product URLs: break long links */
+  .monitorItem small { word-break: break-all; font-size: .8rem; }
+
+  /* KPI cards text */
+  .kpiCard strong { font-size: 1.1rem; }
+  .kpiCard span { font-size: .75rem; }
 }
 
 /* Nexus home layout */
