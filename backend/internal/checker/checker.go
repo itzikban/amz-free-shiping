@@ -22,6 +22,8 @@ type Result struct {
 	FreeShippingCountry bool      `json:"free_shipping_country"`
 	Signal              string    `json:"signal"`
 	Method              string    `json:"method"`
+	Title               string    `json:"title,omitempty"`
+	ImageURL            string    `json:"image_url,omitempty"`
 }
 
 type Service struct {
@@ -39,14 +41,23 @@ var (
 	reAnyUSD              = regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
 )
 
+// New creates a Service with an HTTP client configured with a 20-second timeout.
 func New() *Service {
 	return &Service{Client: &http.Client{Timeout: 20 * time.Second}}
 }
 
 func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Result, error) {
+	return s.CheckURLWithMethod(ctx, url, country, zip, "")
+}
+
+func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, method string) (Result, error) {
 	// 1. Try Decodo API first (preferred method)
-	if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
-		return dres, nil
+	if method != "http" {
+		if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
+			if dres.FreeShippingCountry {
+				return dres, nil
+			}
+		}
 	}
 
 	// 2. Fallback: plain HTTP fetch
@@ -89,6 +100,14 @@ func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Resul
 	return res, nil
 }
 
+// AnalyzeHTML analyzes the provided HTML for pricing, shipping signals and basic product metadata.
+// 
+// AnalyzeHTML normalizes the country (defaults to "IL"), extracts a USD price, and fills a Result
+// with URL, Country, CheckedAt, PriceUSD, FreeShipping, FreeShippingCountry, Signal, Title and ImageURL.
+// It detects CAPTCHA indicators and returns early when found, checks country-specific and general
+// free-shipping phrases, applies a small DOM fallback for common delivery selectors, and recognizes
+// explicit negative markers (e.g., "not eligible for free shipping"). If no signal is detected,
+// Signal is set to "no_free_shipping_signal".
 func AnalyzeHTML(url, country, html string) Result {
 	country = strings.ToUpper(strings.TrimSpace(country))
 	if country == "" {
@@ -107,6 +126,25 @@ func AnalyzeHTML(url, country, html string) Result {
 
 	res := Result{URL: url, Country: country, CheckedAt: time.Now().UTC()}
 	res.PriceUSD = extractUSDPrice(html)
+
+	// Extract product metadata from HTML.
+	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if docErr == nil {
+		if title := strings.TrimSpace(doc.Find("#productTitle").Text()); title != "" {
+			res.Title = title
+		} else {
+			res.Title = strings.TrimSpace(doc.Find("title").First().Text())
+		}
+		doc.Find("#landingImage, #imgTagWrapperId img, #main-image-container img").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+			for _, attr := range []string{"data-old-hires", "src"} {
+				if v, ok := s.Attr(attr); ok && strings.HasPrefix(v, "http") {
+					res.ImageURL = v
+					return false
+				}
+			}
+			return true
+		})
+	}
 
 	captchaSignals := []string{"opfcaptcha", "validatecaptcha", "automated access to amazon data", "enter the characters you see below"}
 	for _, c := range captchaSignals {
@@ -134,8 +172,7 @@ func AnalyzeHTML(url, country, html string) Result {
 	}
 
 	// Small DOM fallback for common selectors.
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err == nil {
+	if docErr == nil {
 		txt := strings.ToLower(strings.TrimSpace(doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE").Text()))
 		if strings.Contains(txt, "free") {
 			if country == "IL" && strings.Contains(txt, "israel") {

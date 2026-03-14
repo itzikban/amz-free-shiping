@@ -11,6 +11,14 @@ export async function GET() {
   }
 }
 
+/**
+ * Create or update the current user's tracked items by forwarding the request body to the backend.
+ *
+ * Reads the request body as JSON and POSTs it to the backend endpoint /v1/me/tracked-items, returning the backend's JSON response and HTTP status.
+ *
+ * @param req - Incoming request whose JSON body will be sent to the backend
+ * @returns The backend response parsed as JSON with the backend HTTP status; if the request body is invalid JSON, returns `{ error: 'invalid_json' }` with status 400; if the backend is unreachable, returns `{ error: 'backend_unreachable', detail }` with status 502
+ */
 export async function POST(req: NextRequest) {
   let payload: unknown;
   try { payload = await req.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
@@ -20,7 +28,7 @@ export async function POST(req: NextRequest) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
       cache: 'no-store',
-    });
+    }, 45000);
     return NextResponse.json(await res.json(), { status: res.status });
   } catch (err) {
     return NextResponse.json({ error: 'backend_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 });

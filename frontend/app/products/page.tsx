@@ -5,6 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
 import { useI18n } from "@/lib/i18n";
 
+/**
+ * Render the products watchlist page with KPIs, search, and a list of tracked products.
+ *
+ * Fetches tracked products on mount and displays fallback data if the network request fails.
+ *
+ * @returns The React element for the products watchlist page.
+ */
 export default function ProductsPage() {
   const { t, formatDate } = useI18n();
   const [items, setItems] = useState<TrackedProduct[]>([]);
@@ -96,7 +103,11 @@ export default function ProductsPage() {
             {filtered.length === 0 && <li>{query.trim() ? t("products_no_results") : t("products_empty")}</li>}
             {filtered.map((it) => (
               <li key={it.id} className="monitorItem">
-                <div>
+                {it.image_url && (
+                  <img className="watchlistThumb" src={it.image_url} alt={it.title || "Product"} />
+                )}
+                <div style={{flex: 1}}>
+                  {it.title && <strong className="watchlistTitle">{it.title}</strong>}
                   <div className="chipRow">
                     <span className={`signalPill ${it.free_shipping_country ? "ok" : "no"}`}>
                       {it.free_shipping_country ? t("products_status_free") : t("products_status_not_free")}
