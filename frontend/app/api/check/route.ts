@@ -19,6 +19,11 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(backendUrl, { method: "GET", cache: "no-store" });
     const body = await res.json();
+    // Strip internal details before sending to client
+    delete body.method;
+    if (body.signal) {
+      body.signal = body.signal.replace(/decodo/gi, "proxy");
+    }
     return NextResponse.json(body, { status: res.status });
   } catch (err) {
     return NextResponse.json(
