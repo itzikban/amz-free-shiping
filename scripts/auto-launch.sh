@@ -9,7 +9,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Backend
+# Backend (internal only — frontend proxies to it)
 BACKEND_DIR="$ROOT_DIR/backend"
 BACKEND_CMD="go run ./cmd/server"
 BACKEND_HOST="127.0.0.1"
@@ -21,9 +21,8 @@ FRONTEND_CMD="npm run dev -- -H 127.0.0.1 -p 3000"
 FRONTEND_HOST="127.0.0.1"
 FRONTEND_PORT="3000"
 
-# Public ports exposed on 0.0.0.0
+# Public port exposed on 0.0.0.0 (frontend only)
 PUBLIC_FRONTEND_PORT="8002"
-PUBLIC_BACKEND_PORT="9001"
 
 # Dependency install commands
 FRONTEND_INSTALL_CMD="npm install"
@@ -39,12 +38,10 @@ LOG_DIR="$ROOT_DIR/.logs"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 SOCAT_FRONTEND_PID_FILE="$RUN_DIR/socat-frontend.pid"
-SOCAT_BACKEND_PID_FILE="$RUN_DIR/socat-backend.pid"
 
 BACKEND_LOG="$LOG_DIR/backend.log"
 FRONTEND_LOG="$LOG_DIR/frontend.log"
 SOCAT_FRONTEND_LOG="$LOG_DIR/socat-frontend.log"
-SOCAT_BACKEND_LOG="$LOG_DIR/socat-backend.log"
 
 #################################
 # NO NEED TO EDIT BELOW USUALLY #
@@ -231,21 +228,18 @@ start_socat_forward() {
 print_summary() {
   echo
   echo "========== RUNNING =========="
-  echo "Backend local:    http://$BACKEND_HOST:$BACKEND_PORT"
-  echo "Backend public:   http://0.0.0.0:$PUBLIC_BACKEND_PORT"
-  echo "Frontend local:   http://$FRONTEND_HOST:$FRONTEND_PORT"
-  echo "Frontend public:  http://0.0.0.0:$PUBLIC_FRONTEND_PORT"
+  echo "Backend (internal): http://$BACKEND_HOST:$BACKEND_PORT"
+  echo "Frontend local:     http://$FRONTEND_HOST:$FRONTEND_PORT"
+  echo "Frontend public:    http://0.0.0.0:$PUBLIC_FRONTEND_PORT"
   echo
   echo "Logs:"
-  echo "  Backend:        $BACKEND_LOG"
-  echo "  Frontend:       $FRONTEND_LOG"
-  echo "  Socat backend:  $SOCAT_BACKEND_LOG"
-  echo "  Socat frontend: $SOCAT_FRONTEND_LOG"
+  echo "  Backend:          $BACKEND_LOG"
+  echo "  Frontend:         $FRONTEND_LOG"
+  echo "  Socat frontend:   $SOCAT_FRONTEND_LOG"
   echo
   echo "PID files:"
   echo "  $BACKEND_PID_FILE"
   echo "  $FRONTEND_PID_FILE"
-  echo "  $SOCAT_BACKEND_PID_FILE"
   echo "  $SOCAT_FRONTEND_PID_FILE"
   echo "============================="
   echo
@@ -259,9 +253,6 @@ show_recent_logs_on_error() {
   echo "----- frontend.log -----"
   tail -n 50 "$FRONTEND_LOG" 2>/dev/null || true
   echo
-  echo "----- socat-backend.log -----"
-  tail -n 50 "$SOCAT_BACKEND_LOG" 2>/dev/null || true
-  echo
   echo "----- socat-frontend.log -----"
   tail -n 50 "$SOCAT_FRONTEND_LOG" 2>/dev/null || true
 }
@@ -270,17 +261,14 @@ cleanup_old() {
   log "Stopping old processes"
   kill_pidfile_if_exists "$BACKEND_PID_FILE" "backend"
   kill_pidfile_if_exists "$FRONTEND_PID_FILE" "frontend"
-  kill_pidfile_if_exists "$SOCAT_BACKEND_PID_FILE" "backend forwarder"
   kill_pidfile_if_exists "$SOCAT_FRONTEND_PID_FILE" "frontend forwarder"
 
   kill_port "$BACKEND_PORT"
   kill_port "$FRONTEND_PORT"
-  kill_port "$PUBLIC_BACKEND_PORT"
   kill_port "$PUBLIC_FRONTEND_PORT"
 
   pkill -f "go run ./cmd/server" 2>/dev/null || true
   pkill -f "socat TCP-LISTEN:$PUBLIC_FRONTEND_PORT" 2>/dev/null || true
-  pkill -f "socat TCP-LISTEN:$PUBLIC_BACKEND_PORT" 2>/dev/null || true
 }
 
 prepare_code() {
@@ -316,7 +304,6 @@ main() {
 
   : > "$BACKEND_LOG"
   : > "$FRONTEND_LOG"
-  : > "$SOCAT_BACKEND_LOG"
   : > "$SOCAT_FRONTEND_LOG"
 
   start_bg "$BACKEND_DIR" "$BACKEND_CMD" "$BACKEND_LOG" "$BACKEND_PID_FILE" "backend"
@@ -325,7 +312,6 @@ main() {
   start_bg "$FRONTEND_DIR" "$FRONTEND_CMD" "$FRONTEND_LOG" "$FRONTEND_PID_FILE" "frontend"
   wait_for_port "$FRONTEND_HOST" "$FRONTEND_PORT" "frontend" 60
 
-  start_socat_forward "$BACKEND_HOST" "$BACKEND_PORT" "$PUBLIC_BACKEND_PORT" "$SOCAT_BACKEND_LOG" "$SOCAT_BACKEND_PID_FILE" "backend"
   start_socat_forward "$FRONTEND_HOST" "$FRONTEND_PORT" "$PUBLIC_FRONTEND_PORT" "$SOCAT_FRONTEND_LOG" "$SOCAT_FRONTEND_PID_FILE" "frontend"
 
   print_summary
