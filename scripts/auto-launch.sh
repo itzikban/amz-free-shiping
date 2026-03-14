@@ -23,7 +23,7 @@ FRONTEND_PORT="3000"
 
 # Public ports exposed on 0.0.0.0
 PUBLIC_FRONTEND_PORT="8002"
-PUBLIC_BACKEND_PORT="8001"
+PUBLIC_BACKEND_PORT="9001"
 
 # Dependency install commands
 FRONTEND_INSTALL_CMD="npm install"
