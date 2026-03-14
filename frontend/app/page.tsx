@@ -148,9 +148,13 @@ export default function HomePage() {
 
       {(result || error) && (
         <section className="fluid-card targetCard animate-flow-2">
-          <div className="targetImage img-placeholder-main" />
+          {result?.image_url ? (
+            <img className="targetImage" src={result.image_url} alt={result.title || "Product"} />
+          ) : (
+            <div className="targetImage img-placeholder-main" />
+          )}
           <div className="targetBody">
-            <h3>{t("home_target_analysis")}</h3>
+            <h3>{result?.title || t("home_target_analysis")}</h3>
             {error && <p className="error">{error}</p>}
             {result && (
               <>
@@ -164,7 +168,7 @@ export default function HomePage() {
                 <div className="chipRow">
                   <span className="signalPill neutral">{result.country}</span>
                   <span className="signalPill neutral">{result.method}</span>
-                  <span className="signalPill neutral">{result.signal}</span>
+                  <span className="signalPill neutral" title={result.signal}>{result.signal.length > 30 ? result.signal.slice(0, 30) + "…" : result.signal}</span>
                 </div>
               </>
             )}

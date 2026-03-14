@@ -22,6 +22,8 @@ type Result struct {
 	FreeShippingCountry bool      `json:"free_shipping_country"`
 	Signal              string    `json:"signal"`
 	Method              string    `json:"method"`
+	Title               string    `json:"title,omitempty"`
+	ImageURL            string    `json:"image_url,omitempty"`
 }
 
 type Service struct {
@@ -112,6 +114,25 @@ func AnalyzeHTML(url, country, html string) Result {
 	res := Result{URL: url, Country: country, CheckedAt: time.Now().UTC()}
 	res.PriceUSD = extractUSDPrice(html)
 
+	// Extract product metadata from HTML.
+	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if docErr == nil {
+		if title := strings.TrimSpace(doc.Find("#productTitle").Text()); title != "" {
+			res.Title = title
+		} else {
+			res.Title = strings.TrimSpace(doc.Find("title").First().Text())
+		}
+		doc.Find("#landingImage, #imgTagWrapperId img, #main-image-container img").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+			for _, attr := range []string{"data-old-hires", "src"} {
+				if v, ok := s.Attr(attr); ok && strings.HasPrefix(v, "http") {
+					res.ImageURL = v
+					return false
+				}
+			}
+			return true
+		})
+	}
+
 	captchaSignals := []string{"opfcaptcha", "validatecaptcha", "automated access to amazon data", "enter the characters you see below"}
 	for _, c := range captchaSignals {
 		if strings.Contains(lower, c) {
@@ -138,8 +159,7 @@ func AnalyzeHTML(url, country, html string) Result {
 	}
 
 	// Small DOM fallback for common selectors.
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err == nil {
+	if docErr == nil {
 		txt := strings.ToLower(strings.TrimSpace(doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE").Text()))
 		if strings.Contains(txt, "free") {
 			if country == "IL" && strings.Contains(txt, "israel") {

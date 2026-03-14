@@ -35,6 +35,8 @@ type TrackedItem struct {
 	FreeShippingStrict bool      `json:"free_shipping_country"`
 	Signal             string    `json:"signal"`
 	Method             string    `json:"method"`
+	Title              string    `json:"title,omitempty"`
+	ImageURL           string    `json:"image_url,omitempty"`
 }
 
 type Product struct {
@@ -225,12 +227,12 @@ func (s *Service) addTrackedItemFromResult(ctx context.Context, req AddTrackedIt
 		dedup = true
 		item = s.items[idx]
 		prevStrict = item.FreeShippingStrict
-		item.LastCheckedAt, item.LastPriceUSD, item.FreeShipping, item.FreeShippingStrict, item.Signal, item.Method = res.CheckedAt, res.PriceUSD, res.FreeShipping, res.FreeShippingCountry, res.Signal, res.Method
+		item.LastCheckedAt, item.LastPriceUSD, item.FreeShipping, item.FreeShippingStrict, item.Signal, item.Method, item.Title, item.ImageURL = res.CheckedAt, res.PriceUSD, res.FreeShipping, res.FreeShippingCountry, res.Signal, res.Method, res.Title, res.ImageURL
 		item.URL, item.ASIN, item.CanonicalURL, item.ProductID = req.URL, asin, canonicalURL, product.ID
 		s.items[idx] = item
 	} else {
 		s.seq++
-		item = TrackedItem{ID: makeID("item", s.seq), UserID: s.user.ID, ProductID: product.ID, ASIN: asin, CanonicalURL: canonicalURL, URL: req.URL, Country: req.Country, ZIP: req.ZIP, CreatedAt: now, LastCheckedAt: res.CheckedAt, LastPriceUSD: res.PriceUSD, FreeShipping: res.FreeShipping, FreeShippingStrict: res.FreeShippingCountry, Signal: res.Signal, Method: res.Method}
+		item = TrackedItem{ID: makeID("item", s.seq), UserID: s.user.ID, ProductID: product.ID, ASIN: asin, CanonicalURL: canonicalURL, URL: req.URL, Country: req.Country, ZIP: req.ZIP, CreatedAt: now, LastCheckedAt: res.CheckedAt, LastPriceUSD: res.PriceUSD, FreeShipping: res.FreeShipping, FreeShippingStrict: res.FreeShippingCountry, Signal: res.Signal, Method: res.Method, Title: res.Title, ImageURL: res.ImageURL}
 		s.items = append([]TrackedItem{item}, s.items...)
 		if len(s.items) > 100 {
 			s.items = s.items[:100]

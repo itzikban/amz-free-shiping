@@ -7,4 +7,6 @@ export type CheckResponse = {
   free_shipping_country: boolean;
   signal: string;
   method: string;
+  title?: string;
+  image_url?: string;
 };

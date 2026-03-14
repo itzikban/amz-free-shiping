@@ -96,7 +96,11 @@ export default function ProductsPage() {
             {filtered.length === 0 && <li>{query.trim() ? t("products_no_results") : t("products_empty")}</li>}
             {filtered.map((it) => (
               <li key={it.id} className="monitorItem">
-                <div>
+                {it.image_url && (
+                  <img className="watchlistThumb" src={it.image_url} alt={it.title || "Product"} />
+                )}
+                <div style={{flex: 1}}>
+                  {it.title && <strong className="watchlistTitle">{it.title}</strong>}
                   <div className="chipRow">
                     <span className={`signalPill ${it.free_shipping_country ? "ok" : "no"}`}>
                       {it.free_shipping_country ? t("products_status_free") : t("products_status_not_free")}
