@@ -17,7 +17,7 @@ BACKEND_PORT="8085"
 
 # Frontend
 FRONTEND_DIR="$ROOT_DIR/frontend"
-FRONTEND_CMD="npm run dev -- --host 127.0.0.1 --port 3000"
+FRONTEND_CMD="npm run dev -- -H 127.0.0.1 -p 3000"
 FRONTEND_HOST="127.0.0.1"
 FRONTEND_PORT="3000"
 
