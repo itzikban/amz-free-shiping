@@ -61,3 +61,43 @@ func TestExtractUSDPrice_PrefersProductPriceOverShippingThreshold(t *testing.T) 
 		t.Fatalf("expected 5.99, got %.2f", p)
 	}
 }
+
+func TestAnalyzeHTML_ExtractsProductTitle(t *testing.T) {
+	html := `<html><body><span id="productTitle"> Test Product Title </span></body></html>`
+	res := AnalyzeHTML("https://example.com/dp/B000TEST", "US", html)
+	if res.Title != "Test Product Title" {
+		t.Fatalf("expected 'Test Product Title', got %q", res.Title)
+	}
+}
+
+func TestAnalyzeHTML_FallsBackToTitleTag(t *testing.T) {
+	html := `<html><head><title>Amazon.com: Fallback Title</title></head><body></body></html>`
+	res := AnalyzeHTML("https://example.com/dp/B000TEST", "US", html)
+	if res.Title != "Amazon.com: Fallback Title" {
+		t.Fatalf("expected 'Amazon.com: Fallback Title', got %q", res.Title)
+	}
+}
+
+func TestAnalyzeHTML_ExtractsMainImage(t *testing.T) {
+	html := `<html><body><img id="landingImage" data-old-hires="https://images-na.ssl-images-amazon.com/images/I/large.jpg" src="https://images-na.ssl-images-amazon.com/images/I/small.jpg" /></body></html>`
+	res := AnalyzeHTML("https://example.com/dp/B000TEST", "US", html)
+	if res.ImageURL != "https://images-na.ssl-images-amazon.com/images/I/large.jpg" {
+		t.Fatalf("expected large image URL, got %q", res.ImageURL)
+	}
+}
+
+func TestAnalyzeHTML_ExtractsImageFromSrc(t *testing.T) {
+	html := `<html><body><div id="imgTagWrapperId"><img src="https://images-na.ssl-images-amazon.com/images/I/product.jpg" /></div></body></html>`
+	res := AnalyzeHTML("https://example.com/dp/B000TEST", "US", html)
+	if res.ImageURL != "https://images-na.ssl-images-amazon.com/images/I/product.jpg" {
+		t.Fatalf("expected product image URL, got %q", res.ImageURL)
+	}
+}
+
+func TestAnalyzeHTML_NoImageWhenMissing(t *testing.T) {
+	html := `<html><body><p>no images here</p></body></html>`
+	res := AnalyzeHTML("https://example.com/dp/B000TEST", "US", html)
+	if res.ImageURL != "" {
+		t.Fatalf("expected empty ImageURL, got %q", res.ImageURL)
+	}
+}
