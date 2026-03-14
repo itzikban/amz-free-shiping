@@ -42,6 +42,7 @@ var (
 	reAnyUSD              = regexp.MustCompile(`\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{2})?)`)
 )
 
+// New creates a Service with an HTTP client configured with a 20-second timeout.
 func New() *Service {
 	return &Service{Client: &http.Client{Timeout: 20 * time.Second}}
 }
@@ -99,6 +100,14 @@ func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, met
 	return res, nil
 }
 
+// AnalyzeHTML analyzes the provided HTML for pricing, shipping signals and basic product metadata.
+// 
+// AnalyzeHTML normalizes the country (defaults to "IL"), extracts a USD price, and fills a Result
+// with URL, Country, CheckedAt, PriceUSD, FreeShipping, FreeShippingCountry, Signal, Title and ImageURL.
+// It detects CAPTCHA indicators and returns early when found, checks country-specific and general
+// free-shipping phrases, applies a small DOM fallback for common delivery selectors, and recognizes
+// explicit negative markers (e.g., "not eligible for free shipping"). If no signal is detected,
+// Signal is set to "no_free_shipping_signal".
 func AnalyzeHTML(url, country, html string) Result {
 	country = strings.ToUpper(strings.TrimSpace(country))
 	if country == "" {

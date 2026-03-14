@@ -12,6 +12,14 @@ type FormState = {
 
 const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
 
+/**
+ * Interactive homepage that lets users analyze product URLs, view analysis results, and add items to a watchlist.
+ *
+ * Provides a URL submission form with destination and optional US ZIP, a fetch-method toggle, result and error display,
+ * a button to add the analyzed item to the user's watchlist, and a loading state that shows placeholder recommendations.
+ *
+ * @returns The rendered React element for the product analysis home page.
+ */
 export default function HomePage() {
   const { t } = useI18n();
   const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "IL", zip: "10013" });
@@ -21,6 +29,7 @@ export default function HomePage() {
   const [submittedForm, setSubmittedForm] = useState<FormState | null>(null);
   const [addingWatchlist, setAddingWatchlist] = useState(false);
   const [watchlistAdded, setWatchlistAdded] = useState(false);
+  const [fetchMethod, setFetchMethod] = useState<"auto" | "http">("auto");
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
@@ -47,6 +56,7 @@ export default function HomePage() {
     try {
       const params = new URLSearchParams({ url: submitted.url, country: submitted.country });
       if (submitted.country === "US" && submitted.zip) params.set("zip", submitted.zip);
+      if (fetchMethod === "http") params.set("method", "http");
       const res = await fetch(`/api/check?${params.toString()}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");

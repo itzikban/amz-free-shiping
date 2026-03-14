@@ -5,6 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { getFallbackTrackedProducts, TrackedProduct } from "@/lib/watchlist";
 import { useI18n } from "@/lib/i18n";
 
+/**
+ * Render the products watchlist page with KPIs, search, and a list of tracked products.
+ *
+ * Fetches tracked products on mount and displays fallback data if the network request fails.
+ *
+ * @returns The React element for the products watchlist page.
+ */
 export default function ProductsPage() {
   const { t, formatDate } = useI18n();
   const [items, setItems] = useState<TrackedProduct[]>([]);

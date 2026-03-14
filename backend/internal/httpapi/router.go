@@ -13,6 +13,9 @@ import (
 	"free-ship-checker-go/internal/userpanel"
 )
 
+// NewRouter constructs and returns an http.Handler that serves the application's HTTP API.
+// It registers endpoints for health checks, URL checking, monitoring, user panel (v1/me) and admin actions,
+// and wires the checker, monitor, userpanel, and admin services used by those routes.
 func NewRouter() http.Handler {
 	mux := http.NewServeMux()
 	svc := checker.New()
@@ -36,11 +39,12 @@ func NewRouter() http.Handler {
 		url := r.URL.Query().Get("url")
 		country := r.URL.Query().Get("country")
 		zip := r.URL.Query().Get("zip")
+		method := r.URL.Query().Get("method")
 		if url == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing url query param"})
 			return
 		}
-		res, err := svc.CheckURL(r.Context(), url, country, zip)
+		res, err := svc.CheckURLWithMethod(r.Context(), url, country, zip, method)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 			return
