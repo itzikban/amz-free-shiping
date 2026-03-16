@@ -194,7 +194,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {loading && (
+      {(loading || (result && !result.free_shipping_country)) && (
         <>
           <section className="flowHint animate-flow-3">
             <span>{t("home_flow_hint")}</span>
