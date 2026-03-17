@@ -79,14 +79,26 @@ func (s *Service) decodoAnalyze(ctx context.Context, url, country, zip string) (
 }
 
 // decodoScrapeAlternatives uses Decodo to scrape Amazon search results for alternatives
-func (s *Service) decodoScrapeAlternatives(ctx context.Context, searchQuery string) ([]Alternative, error) {
+func (s *Service) decodoScrapeAlternatives(ctx context.Context, searchQuery string, country string) ([]Alternative, error) {
 	token := os.Getenv("DECODO_BASIC_AUTH")
 	if token == "" {
 		return nil, fmt.Errorf("missing DECODO_BASIC_AUTH")
 	}
 
-	// Build search URL for Amazon
-	searchURL := fmt.Sprintf("https://www.amazon.com/s?k=%s", strings.ReplaceAll(searchQuery, " ", "+"))
+	// Map countries to appropriate Amazon domains
+	// Only use domains that Decodo has been tested to work reliably
+	amazonDomain := "com" // default
+	switch country {
+	case "NL":
+		amazonDomain = "nl"
+	case "DE":
+		amazonDomain = "de"
+	case "IL", "MT", "CY":
+		amazonDomain = "com" // Use US domain for non-EU countries
+	}
+
+	// Build search URL for appropriate Amazon domain
+	searchURL := fmt.Sprintf("https://www.amazon.%s/s?k=%s", amazonDomain, strings.ReplaceAll(searchQuery, " ", "+"))
 	payload, _ := json.Marshal(decodoReq{Target: "amazon_search", Query: searchURL})
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://scraper-api.decodo.com/v2/scrape", bytes.NewReader(payload))

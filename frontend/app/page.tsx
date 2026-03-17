@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 
 type FormState = {
   url: string;
-  country: "US" | "IL" | "MT" | "CY";
+  country: "US" | "IL" | "NL";
   zip: string;
 };
 
@@ -22,7 +22,7 @@ const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
  */
 export default function HomePage() {
   const { t } = useI18n();
-  const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "IL", zip: "10013" });
+  const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "IL", zip: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
@@ -156,12 +156,11 @@ export default function HomePage() {
               id="destination-country"
               className="clean-input"
               value={form.country}
-              onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" | "MT" | "CY" }))}
+              onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" | "NL" }))}
             >
               <option value="IL">{t("home_country_il")}</option>
               <option value="US">{t("home_country_us")}</option>
-              <option value="MT">Malta (MT)</option>
-              <option value="CY">Cyprus (CY)</option>
+              <option value="NL">🇳🇱 Netherlands (NL)</option>
             </select>
           </div>
 
@@ -176,14 +175,6 @@ export default function HomePage() {
                 onChange={(e) => setForm((x) => ({ ...x, zip: e.target.value }))}
                 placeholder={t("home_zip_placeholder")}
               />
-            </div>
-          )}
-
-          {(form.country === "MT" || form.country === "CY") && (
-            <div className="search-row fixed">
-              <span className="clean-input" style={{ color: "#666", pointerEvents: "none" }}>
-                {form.country === "MT" ? "🇲🇹 Malta" : "🇨🇾 Cyprus"}
-              </span>
             </div>
           )}
 

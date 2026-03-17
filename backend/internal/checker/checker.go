@@ -121,8 +121,8 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 			log.Printf("[DEBUG] Scraper: found %d alternatives", len(alts))
 		}
 	case "decodo":
-		log.Printf("[DEBUG] Using Decodo scraper to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
-		alts, err = s.decodoScrapeAlternatives(ctx, res.Title)
+		log.Printf("[DEBUG] Using Decodo scraper to fetch alternatives for: %s (country: %s)", res.Title[:min(50, len(res.Title))], res.Country)
+		alts, err = s.decodoScrapeAlternatives(ctx, res.Title, res.Country)
 		if err != nil {
 			log.Printf("[DEBUG] Decodo: search failed: %v", err)
 		} else {
