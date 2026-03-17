@@ -252,7 +252,7 @@ func extractAlternativesFromHTML(html string) []Alternative {
 
 	log.Printf("[DEBUG] extractAlternativesFromHTML: found %d valid alternatives", len(alts))
 
-	// Fallback: If no alternatives found, return realistic suggestions with images
+	// Fallback: If no alternatives found, return realistic suggestions (no images - let frontend show placeholders)
 	if len(alts) == 0 {
 		log.Printf("[DEBUG] No alternatives extracted, using fallback products")
 		alts = []Alternative{
@@ -260,7 +260,6 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJRG5J4C",
 				Title:        "Professional LED Grow Light for Indoor Plants, Full Spectrum 5000K, Dimmable",
 				URL:          "https://amazon.com/dp/B0FJRG5J4C",
-				ImageURL:     "https://picsum.photos/300/300?random=1",
 				PriceUSD:     45.99,
 				FreeShipping: true,
 			},
@@ -268,7 +267,6 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJR2RNYW",
 				Title:        "Sunlike Plant Grow Lamp Strip, 4FT LED Growing Light, Red & Blue Spectrum",
 				URL:          "https://amazon.com/dp/B0FJR2RNYW",
-				ImageURL:     "https://picsum.photos/300/300?random=2",
 				PriceUSD:     39.99,
 				FreeShipping: true,
 			},
@@ -276,7 +274,6 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJRCZ1BM",
 				Title:        "Seedling Heat Mat with LED Grow Light Combo, Waterproof, Adjustable Height",
 				URL:          "https://amazon.com/dp/B0FJRCZ1BM",
-				ImageURL:     "https://picsum.photos/300/300?random=3",
 				PriceUSD:     49.99,
 				FreeShipping: true,
 			},
@@ -284,7 +281,6 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJR5KXXX",
 				Title:        "Smart WiFi Grow Light with Timer, Full Spectrum Plant Light, Indoor Garden",
 				URL:          "https://amazon.com/dp/B0FJR5KXXX",
-				ImageURL:     "https://picsum.photos/300/300?random=4",
 				PriceUSD:     55.99,
 				FreeShipping: true,
 			},
@@ -292,7 +288,6 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJR9MYYY",
 				Title:        "Horticultural LED Panel Grow Light, High PPFD Output, Commercial Grade",
 				URL:          "https://amazon.com/dp/B0FJR9MYYY",
-				ImageURL:     "https://picsum.photos/300/300?random=5",
 				PriceUSD:     89.99,
 				FreeShipping: true,
 			},

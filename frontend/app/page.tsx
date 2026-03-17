@@ -111,7 +111,7 @@ export default function HomePage() {
     price: string;
   } & (
     | { type: "mock"; titleKey: string; cls: string }
-    | { type: "real"; title: string; imageUrl?: string }
+    | { type: "real"; title: string; imageUrl?: string; url?: string }
   );
 
   const recommendations: RecommendationCard[] = result?.alternatives && result.alternatives.length > 0
@@ -121,6 +121,7 @@ export default function HomePage() {
         title: alt.title,
         price: alt.price_usd ? `$${alt.price_usd.toFixed(2)}` : "N/A",
         imageUrl: alt.image_url,
+        url: alt.url,
       }))
     : mockRecommendations.map((r) => ({
         id: r.id,
@@ -229,27 +230,46 @@ export default function HomePage() {
           </section>
 
           <section className="recommendGrid animate-flow-3">
-            {recommendations.map((r) => (
-              <article key={r.id} className="fluid-card recCard">
-                {r.type === "mock" ? (
-                  <div className={`recImage ${r.cls}`} />
-                ) : (
-                  r.imageUrl ? (
-                    <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} />
+            {recommendations.map((r) => {
+              const content = (
+                <>
+                  {r.type === "mock" ? (
+                    <div className={`recImage ${r.cls}`} />
                   ) : (
-                    <div className="recImage img-placeholder-1" />
-                  )
-                )}
-                <h4>{r.type === "mock" ? t(r.titleKey) : r.title}</h4>
-                <div className="recMeta">
-                  <strong>{r.price}</strong>
-                  <div className="chipRow">
-                    {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
-                    <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
+                    r.imageUrl ? (
+                      <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} />
+                    ) : (
+                      <div className="recImage img-placeholder-1" />
+                    )
+                  )}
+                  <h4>{r.type === "mock" ? t(r.titleKey) : r.title}</h4>
+                  <div className="recMeta">
+                    <strong>{r.price}</strong>
+                    <div className="chipRow">
+                      {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
+                      <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </>
+              );
+
+              return r.type === "real" && r.url ? (
+                <a
+                  key={r.id}
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="fluid-card recCard"
+                  style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                >
+                  {content}
+                </a>
+              ) : (
+                <article key={r.id} className="fluid-card recCard">
+                  {content}
+                </article>
+              );
+            })}
           </section>
         </>
       )}
