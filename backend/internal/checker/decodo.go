@@ -78,28 +78,32 @@ func (s *Service) decodoAnalyze(ctx context.Context, url, country, zip string) (
 	return res, nil
 }
 
-// decodoScrapeAlternatives uses Decodo to scrape Amazon search results for alternatives
-func (s *Service) decodoScrapeAlternatives(ctx context.Context, searchQuery string, country string) ([]Alternative, error) {
+// decodoFetchAlternatives fetches alternatives using amazon_product + markdown:true,
+// then parses the "Similar items that may deliver to you quickly" section.
+// This is more reliable than amazon_search because Amazon curates the similar-items
+// list itself — guaranteeing relevant, in-category results.
+func (s *Service) decodoFetchAlternatives(ctx context.Context, asin string) ([]Alternative, error) {
 	token := os.Getenv("DECODO_BASIC_AUTH")
 	if token == "" {
 		return nil, fmt.Errorf("missing DECODO_BASIC_AUTH")
 	}
-
-	// Map countries to appropriate Amazon domains
-	// Only use domains that Decodo has been tested to work reliably
-	amazonDomain := "com" // default
-	switch country {
-	case "NL":
-		amazonDomain = "nl"
-	case "DE":
-		amazonDomain = "de"
-	case "IL", "MT", "CY":
-		amazonDomain = "com" // Use US domain for non-EU countries
+	if asin == "" {
+		return nil, fmt.Errorf("no ASIN to look up alternatives for")
 	}
 
-	// Build search URL for appropriate Amazon domain
-	searchURL := fmt.Sprintf("https://www.amazon.%s/s?k=%s", amazonDomain, strings.ReplaceAll(searchQuery, " ", "+"))
-	payload, _ := json.Marshal(decodoReq{Target: "amazon_search", Query: searchURL})
+	payload, _ := json.Marshal(struct {
+		Target            string `json:"target"`
+		Query             string `json:"query"`
+		Headless          string `json:"headless"`
+		AutoselectVariant bool   `json:"autoselect_variant"`
+		Markdown          bool   `json:"markdown"`
+	}{
+		Target:            "amazon_product",
+		Query:             asin,
+		Headless:          "html",
+		AutoselectVariant: true,
+		Markdown:          true,
+	})
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://scraper-api.decodo.com/v2/scrape", bytes.NewReader(payload))
 	if err != nil {
@@ -115,189 +119,117 @@ func (s *Service) decodoScrapeAlternatives(ctx context.Context, searchQuery stri
 		return nil, err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("decodo status: %d", resp.StatusCode)
 	}
 
 	var out decodoResp
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decodo decode: %w", err)
 	}
-	if len(out.Results) == 0 {
-		return nil, fmt.Errorf("decodo empty results")
+	if len(out.Results) == 0 || len(out.Results[0].Content) < 1000 {
+		return nil, fmt.Errorf("decodo empty or schema-only response")
 	}
 
-	// Parse HTML to extract product cards with free shipping
-	html := out.Results[0].Content
-	alternatives := extractAlternativesFromHTML(html)
-	return alternatives, nil
+	markdown := out.Results[0].Content
+	log.Printf("[DEBUG] decodoFetchAlternatives: markdown len=%d", len(markdown))
+	alts := extractAlternativesFromMarkdown(markdown)
+	log.Printf("[DEBUG] decodoFetchAlternatives: extracted %d alternatives", len(alts))
+	return alts, nil
 }
 
-// extractAlternativesFromHTML parses Amazon search results HTML to extract product info
-func extractAlternativesFromHTML(html string) []Alternative {
+var (
+	reMarkdownAsin     = regexp.MustCompile(`/dp/([A-Z0-9]{10})`)
+	reMarkdownImage    = regexp.MustCompile(`!\[[^\]]*\]\((https?://[^\)]+)\)`)
+	reMarkdownTitle    = regexp.MustCompile(`(?:^|[^!])\[([^\]]{20,})\]\((?:/[A-Za-z]|https?://www\.amazon)`)
+	reMarkdownPrice    = regexp.MustCompile(`\[\$([0-9,]+\.[0-9]{2})|\$([0-9,]+\.[0-9]{2})`)
+	reMarkdownAltText  = regexp.MustCompile(`!\[([^\]]{20,})\]`)
+	reMarkdownListItem = regexp.MustCompile(`\n\d+\. `)
+)
+
+// extractAlternativesFromMarkdown parses the "Similar items that may deliver to you quickly"
+// numbered list from an Amazon product page returned as markdown by Decodo.
+func extractAlternativesFromMarkdown(markdown string) []Alternative {
+	// Locate the similar-items section
+	sectionStart := strings.Index(markdown, "## Similar items that may deliver to you quickly")
+	if sectionStart < 0 {
+		sectionStart = strings.Index(markdown, "## More items to explore")
+	}
+	if sectionStart < 0 {
+		log.Printf("[DEBUG] extractAlternativesFromMarkdown: similar-items section not found")
+		return nil
+	}
+
+	// Find end of section (next major heading)
+	endIdx := len(markdown)
+	for _, marker := range []string{"## Product information", "## Frequently bought together", "## Product description"} {
+		if pos := strings.Index(markdown[sectionStart+50:], marker); pos >= 0 {
+			if abs := sectionStart + 50 + pos; abs < endIdx {
+				endIdx = abs
+			}
+		}
+	}
+
+	section := markdown[sectionStart:endIdx]
+	itemParts := reMarkdownListItem.Split(section, -1)
+
 	var alts []Alternative
-	lower := strings.ToLower(html)
-	log.Printf("[DEBUG] Searching in HTML of length %d bytes", len(html))
-
-	// Extract all unique ASINs from data-asin attributes
-	asinPattern := regexp.MustCompile(`data-asin="([A-Z0-9]{10})"`)
-	asinMatches := asinPattern.FindAllStringSubmatch(html, 100)
-
-	log.Printf("[DEBUG] Found %d data-asin matches in HTML", len(asinMatches))
-
-	seenASINs := make(map[string]bool)
-
-	for _, match := range asinMatches {
-		if len(alts) >= 5 {
+	for _, item := range itemParts[1:] { // itemParts[0] is the section header
+		if len(alts) >= 3 {
 			break
 		}
 
-		if len(match) < 2 || len(match[1]) != 10 {
+		// ASIN — first /dp/ link in the item
+		asinMatch := reMarkdownAsin.FindStringSubmatch(item)
+		if len(asinMatch) < 2 {
 			continue
 		}
+		asin := asinMatch[1]
 
-		asin := match[1]
-		if seenASINs[asin] {
-			continue // Skip duplicates
+		// Image URL
+		imgURL := ""
+		if m := reMarkdownImage.FindStringSubmatch(item); len(m) >= 2 {
+			imgURL = m[1]
 		}
-		seenASINs[asin] = true
 
-		// Extract title - try multiple strategies
+		// Title — prefer the standalone text link over the image alt
 		title := ""
-
-		// Strategy 1: Look in nearby a href aria-label
-		aLabelPattern := regexp.MustCompile(fmt.Sprintf(
-			`data-asin="%s"[^>]*>.*?<a[^>]*aria-label="([^"]{30,300})"`,
-			regexp.QuoteMeta(asin)))
-		if matches := aLabelPattern.FindStringSubmatch(html); len(matches) > 1 {
-			title = strings.TrimSpace(matches[1])
+		if m := reMarkdownTitle.FindStringSubmatch(item); len(m) >= 2 {
+			title = strings.TrimSpace(m[1])
 		}
-
-		// Strategy 2: Look for h2 with aria-label
-		if title == "" {
-			ariaPattern := regexp.MustCompile(fmt.Sprintf(
-				`data-asin="%s"[^>]*>.*?<h2[^>]*aria-label="([^"]{20,300})"`,
-				regexp.QuoteMeta(asin)))
-			if matches := ariaPattern.FindStringSubmatch(html); len(matches) > 1 {
-				title = strings.TrimSpace(matches[1])
+		if len(title) < 15 {
+			// fallback: image alt text
+			if m := reMarkdownAltText.FindStringSubmatch(item); len(m) >= 2 {
+				title = strings.TrimSpace(m[1])
 			}
 		}
-
-		// Strategy 3: Look for h2 > span
-		if title == "" {
-			spanPattern := regexp.MustCompile(fmt.Sprintf(
-				`data-asin="%s"[^>]*>.*?<h2[^>]*>.*?<span[^>]*>([^<]{20,300})</span>`,
-				regexp.QuoteMeta(asin)))
-			if matches := spanPattern.FindStringSubmatch(html); len(matches) > 1 {
-				candidate := strings.TrimSpace(matches[1])
-				if len(candidate) > 20 && !strings.Contains(candidate, "$") {
-					title = candidate
-				}
-			}
-		}
-
-		// Strategy 4: Look for h2 text directly
-		if title == "" {
-			h2Pattern := regexp.MustCompile(fmt.Sprintf(
-				`data-asin="%s"[^>]*>.*?<h2[^>]*>([^<]{20,300})</h2>`,
-				regexp.QuoteMeta(asin)))
-			if matches := h2Pattern.FindStringSubmatch(html); len(matches) > 1 {
-				candidate := strings.TrimSpace(matches[1])
-				if !strings.Contains(candidate, "<") && len(candidate) > 20 {
-					title = candidate
-				}
-			}
-		}
-
-		// If no title found, log and skip
-		if title == "" || len(title) < 20 {
-			log.Printf("[DEBUG] Skipped ASIN %s: no title found", asin)
+		if len(title) < 15 {
 			continue
 		}
 
-		log.Printf("[DEBUG] Found title for %s: %s", asin, title[:min(50, len(title))])
-
-		// Extract price from the search results page (general, not product-specific)
+		// Price — markdown duplicates like [$59.49$59.49](url); first capture wins
 		price := 0.0
-		pricePattern := regexp.MustCompile(`\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)`)
-		if matches := pricePattern.FindStringSubmatch(html); len(matches) > 1 {
-			priceStr := strings.ReplaceAll(matches[1], ",", "")
-			if p, err := strconv.ParseFloat(priceStr, 64); err == nil && p > 0 && p < 10000 {
+		if m := reMarkdownPrice.FindStringSubmatch(item); len(m) >= 3 {
+			priceStr := m[1]
+			if priceStr == "" {
+				priceStr = m[2]
+			}
+			if p, err := strconv.ParseFloat(strings.ReplaceAll(priceStr, ",", ""), 64); err == nil && p > 0 {
 				price = p
 			}
 		}
 
-		// Extract image URL
-		imageURL := ""
-		imgPattern := regexp.MustCompile(`src="([^"]*(?:ssl-images-amazon|m\.media-amazon)[^"]*)"`)
-		if matches := imgPattern.FindStringSubmatch(html); len(matches) > 1 {
-			imageURL = matches[1]
-		}
+		freeShip := strings.Contains(item, "FREE Shipping") || strings.Contains(item, "Free Shipping")
 
-		// Check for free shipping
-		freeShipping := strings.Contains(lower, "free shipping") || strings.Contains(lower, "free delivery")
-
-		alt := Alternative{
+		alts = append(alts, Alternative{
 			ASIN:         asin,
 			Title:        title,
-			URL:          fmt.Sprintf("https://amazon.com/dp/%s", asin),
-			ImageURL:     imageURL,
+			URL:          fmt.Sprintf("https://www.amazon.com/dp/%s", asin),
+			ImageURL:     imgURL,
 			PriceUSD:     price,
-			FreeShipping: freeShipping,
-		}
-		alts = append(alts, alt)
-		log.Printf("[DEBUG] Extracted product: %s - %s (price: $%.2f)", asin, title[:min(50, len(title))], price)
-	}
-
-	log.Printf("[DEBUG] extractAlternativesFromHTML: found %d valid alternatives", len(alts))
-
-	// Fallback: If no alternatives found, return realistic suggestions with Amazon product images
-	if len(alts) == 0 {
-		log.Printf("[DEBUG] No alternatives extracted, using fallback products")
-
-		alts = []Alternative{
-			{
-				ASIN:         "B0FJRG5J4C",
-				Title:        "Professional LED Grow Light for Indoor Plants, Full Spectrum 5000K, Dimmable",
-				URL:          "https://amazon.com/dp/B0FJRG5J4C",
-				ImageURL:     "https://m.media-amazon.com/images/I/71WqPdmHcdL._AC_SL1500_.jpg",
-				PriceUSD:     45.99,
-				FreeShipping: true,
-			},
-			{
-				ASIN:         "B0FJR2RNYW",
-				Title:        "Sunlike Plant Grow Lamp Strip, 4FT LED Growing Light, Red & Blue Spectrum",
-				URL:          "https://amazon.com/dp/B0FJR2RNYW",
-				ImageURL:     "https://m.media-amazon.com/images/I/81WyWSIa8TL._AC_SL1500_.jpg",
-				PriceUSD:     39.99,
-				FreeShipping: true,
-			},
-			{
-				ASIN:         "B0FJRCZ1BM",
-				Title:        "Seedling Heat Mat with LED Grow Light Combo, Waterproof, Adjustable Height",
-				URL:          "https://amazon.com/dp/B0FJRCZ1BM",
-				ImageURL:     "https://m.media-amazon.com/images/I/719aC8xMioL._AC_SL1500_.jpg",
-				PriceUSD:     49.99,
-				FreeShipping: true,
-			},
-			{
-				ASIN:         "B0FJR5KXXX",
-				Title:        "Smart WiFi Grow Light with Timer, Full Spectrum Plant Light, Indoor Garden",
-				URL:          "https://amazon.com/dp/B0FJR5KXXX",
-				ImageURL:     "https://m.media-amazon.com/images/I/81gcGOSloCL._AC_SL1500_.jpg",
-				PriceUSD:     55.99,
-				FreeShipping: true,
-			},
-			{
-				ASIN:         "B0FJR9MYYY",
-				Title:        "Horticultural LED Panel Grow Light, High PPFD Output, Commercial Grade",
-				URL:          "https://amazon.com/dp/B0FJR9MYYY",
-				ImageURL:     "https://m.media-amazon.com/images/I/71vuW7i-IIL._AC_SL1500_.jpg",
-				PriceUSD:     89.99,
-				FreeShipping: true,
-			},
-		}
+			FreeShipping: freeShip,
+		})
+		log.Printf("[DEBUG] alt: %s — %s (price=%.2f free=%v)", asin, title[:min(50, len(title))], price, freeShip)
 	}
 
 	return alts
