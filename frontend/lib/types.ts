@@ -1,3 +1,12 @@
+export type Alternative = {
+  asin: string;
+  title: string;
+  url: string;
+  image_url?: string;
+  price_usd?: number;
+  free_shipping: boolean;
+};
+
 export type CheckResponse = {
   url: string;
   country: string;
@@ -8,4 +17,5 @@ export type CheckResponse = {
   signal: string;
   title?: string;
   image_url?: string;
+  alternatives?: Alternative[];
 };

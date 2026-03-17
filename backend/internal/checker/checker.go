@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,22 +16,44 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+type Alternative struct {
+	ASIN         string  `json:"asin"`
+	Title        string  `json:"title"`
+	URL          string  `json:"url"`
+	ImageURL     string  `json:"image_url,omitempty"`
+	PriceUSD     float64 `json:"price_usd,omitempty"`
+	FreeShipping bool    `json:"free_shipping"`
+}
+
+// ShippingOption represents a country where product can be shipped with free shipping
+type ShippingOption struct {
+	Country       string  `json:"country"`
+	CountryName   string  `json:"country_name"`
+	AmazonDomain  string  `json:"amazon_domain"`
+	Currency      string  `json:"currency"`
+	Price         float64 `json:"price,omitempty"`
+	FreeShipping  bool    `json:"free_shipping"`
+}
+
 type Result struct {
-	URL                 string    `json:"url"`
-	Country             string    `json:"country"`
-	CheckedAt           time.Time `json:"checked_at"`
-	PriceUSD            float64   `json:"price_usd,omitempty"`
-	FreeShipping        bool      `json:"free_shipping"`
-	FreeShippingCountry bool      `json:"free_shipping_country"`
-	Signal              string    `json:"signal"`
-	Method              string    `json:"method"`
-	Title               string    `json:"title,omitempty"`
-	ImageURL            string    `json:"image_url,omitempty"`
+	URL                string         `json:"url"`
+	Country            string         `json:"country"`
+	CheckedAt          time.Time      `json:"checked_at"`
+	PriceUSD           float64        `json:"price_usd,omitempty"`
+	FreeShipping       bool           `json:"free_shipping"`
+	FreeShippingCountry bool          `json:"free_shipping_country"`
+	Signal             string         `json:"signal"`
+	Method             string         `json:"method"`
+	Title              string         `json:"title,omitempty"`
+	ImageURL           string         `json:"image_url,omitempty"`
+	Alternatives       []Alternative  `json:"alternatives,omitempty"`
+	ShippingOptions    []ShippingOption `json:"shipping_options,omitempty"` // Available countries with free shipping
 }
 
 type Service struct {
 	Client      *http.Client
 	FetchMethod string // "auto" or "http"
+	AltCache    interface{} // *altcache.Cache, nil = no caching (avoids import cycle)
 }
 
 var (
@@ -47,6 +72,413 @@ func New() *Service {
 	return &Service{Client: &http.Client{Timeout: 20 * time.Second}}
 }
 
+// enrichWithAlternatives fetches PA-API alternatives when product doesn't have free shipping
+func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Result, error) {
+	log.Printf("[DEBUG] enrichWithAlternatives called: free_shipping_country=%v, title_len=%d", res.FreeShippingCountry, len(res.Title))
+
+	// Only fetch alternatives if no free shipping for country and we have a product title
+	if res.FreeShippingCountry || res.Title == "" {
+		log.Printf("[DEBUG] skipping alternatives: free_shipping_country=%v or title empty", res.FreeShippingCountry)
+		return res, nil
+	}
+
+	// Try to extract ASIN from the product URL for caching
+	// Use inline extraction to avoid import (cache is optional)
+	asin := extractASINFromURL(res.URL)
+	log.Printf("[DEBUG] extracted ASIN: %s", asin)
+
+	// Check cache first (if available)
+	if s.AltCache != nil && asin != "" {
+		// Use reflection to call cache methods without importing altcache
+		cache := s.AltCache
+		// Get method: func(ctx, asin) ([]Alternative, bool)
+		if getter, ok := cache.(interface {
+			Get(context.Context, string) ([]Alternative, bool)
+		}); ok {
+			if alts, ok := getter.Get(ctx, asin); ok {
+				res.Alternatives = alts
+				return res, nil
+			}
+		}
+	}
+
+	// Cache miss or no cache: call scraper, PA-API, or decodo based on config
+	altFetchMethod := os.Getenv("ALT_FETCH_METHOD")
+	if altFetchMethod == "" {
+		altFetchMethod = "scraper" // Default to real scraper
+	}
+
+	var alts []Alternative
+	var err error
+
+	switch altFetchMethod {
+	case "scraper":
+		log.Printf("[DEBUG] Using Amazon scraper to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
+		alts, err = s.scrapeAmazonAlternatives(ctx, res.Title)
+		if err != nil {
+			log.Printf("[DEBUG] Scraper: search failed: %v", err)
+		} else {
+			log.Printf("[DEBUG] Scraper: found %d alternatives", len(alts))
+		}
+	case "decodo":
+		log.Printf("[DEBUG] Using Decodo scraper to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
+		alts, err = s.decodoScrapeAlternatives(ctx, res.Title)
+		if err != nil {
+			log.Printf("[DEBUG] Decodo: search failed: %v", err)
+		} else {
+			log.Printf("[DEBUG] Decodo: found %d alternatives", len(alts))
+		}
+	case "demo":
+		log.Printf("[DEBUG] Using demo mode for alternatives: %s", res.Title[:min(50, len(res.Title))])
+		alts = generateDemoAlternatives(res.Title, asin)
+		log.Printf("[DEBUG] Demo mode: generated %d alternatives", len(alts))
+	case "paapi":
+		// Use PA-API
+		paa := NewPAAClient()
+		log.Printf("[DEBUG] PA-API: searching for alternatives: asin=%s, title=%s", asin, res.Title[:min(50, len(res.Title))])
+		alts, err = paa.SearchItems(ctx, res.Title, 3)
+		if err != nil {
+			log.Printf("[DEBUG] PA-API: search failed: %v", err)
+		} else {
+			log.Printf("[DEBUG] PA-API: found %d alternatives", len(alts))
+		}
+	default:
+		// Unknown method, try scraper as fallback
+		log.Printf("[DEBUG] Unknown ALT_FETCH_METHOD=%s, falling back to scraper", altFetchMethod)
+		alts, err = s.scrapeAmazonAlternatives(ctx, res.Title)
+		if err != nil {
+			log.Printf("[DEBUG] Scraper fallback: search failed: %v", err)
+		}
+	}
+
+	if err == nil && len(alts) > 0 {
+		res.Alternatives = alts
+		// Write to cache (if available)
+		if s.AltCache != nil && asin != "" {
+			if putter, ok := s.AltCache.(interface {
+				Put(context.Context, string, string, []Alternative)
+			}); ok {
+				putter.Put(ctx, asin, res.Title, alts)
+			}
+		}
+	}
+	// Silently ignore PA-API/scraper errors — it's a bonus feature
+	return res, nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// extractASINFromURL extracts ASIN from various Amazon URL formats
+func extractASINFromURL(rawURL string) string {
+	u := strings.ToUpper(strings.TrimSpace(rawURL))
+
+	// Check if it's already a bare ASIN
+	if len(u) == 10 && isValidASIN(u) {
+		return u
+	}
+
+	// Try common Amazon URL patterns
+	for _, pattern := range []string{"/DP/", "/GP/PRODUCT/", "ASIN="} {
+		if idx := strings.Index(u, pattern); idx >= 0 {
+			start := idx + len(pattern)
+			if start+10 <= len(u) {
+				candidate := u[start : start+10]
+				if isValidASIN(candidate) {
+					return candidate
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// isValidASIN checks if a string is a valid 10-character ASIN
+func isValidASIN(s string) bool {
+	if len(s) != 10 {
+		return false
+	}
+	for _, r := range s {
+		if (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+// scrapeAmazonAlternatives scrapes real Amazon search results for alternatives
+func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery string) ([]Alternative, error) {
+	// Build Amazon search URL - use simplified query to get better results
+	keywords := strings.Fields(searchQuery)
+	if len(keywords) > 3 {
+		keywords = keywords[:3] // Use only first 3 words to avoid blocking
+	}
+	simpleQuery := strings.Join(keywords, " ")
+	searchURL := fmt.Sprintf("https://www.amazon.com/s?k=%s&ref=nb_sb_noss", url.QueryEscape(simpleQuery))
+	log.Printf("[DEBUG] Scraper: searching for '%s'", simpleQuery)
+
+	// Create request with browser-like headers
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Connection", "keep-alive")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("amazon status: %d", resp.StatusCode)
+	}
+
+	// Parse HTML with goquery
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parse html: %w", err)
+	}
+
+	var alts []Alternative
+	seenASINs := make(map[string]bool)
+
+	// Try multiple selectors for product listings (Amazon changes HTML structure frequently)
+	selectors := []string{
+		"[data-component-type='s-search-result']",
+		"[data-asin]",
+		"div[data-asin]",
+		".s-result-item",
+	}
+
+	for _, selector := range selectors {
+		doc.Find(selector).Each(func(i int, container *goquery.Selection) {
+			if len(alts) >= 5 {
+				return
+			}
+
+			// Try to get ASIN from data-asin attribute or URL
+			asin, ok := container.Attr("data-asin")
+			if !ok || asin == "" {
+				// Try to extract from URL
+				if href, ok := container.Find("a[href*='/dp/']").Attr("href"); ok {
+					parts := strings.Split(href, "/dp/")
+					if len(parts) > 1 {
+						asin = strings.Split(parts[1], "/")[0]
+						asin = strings.Split(asin, "?")[0] // Remove query params
+					}
+				}
+			}
+
+			if asin == "" || len(asin) < 10 {
+				return
+			}
+			if seenASINs[asin] {
+				return
+			}
+			seenASINs[asin] = true
+
+			// Get title - try multiple selectors
+			title := ""
+			titleSelectors := []string{
+				"h2 a span",
+				"h2 span",
+				"a.a-link-normal span",
+				".a-text-normal",
+			}
+			for _, ts := range titleSelectors {
+				title = strings.TrimSpace(container.Find(ts).First().Text())
+				if title != "" {
+					break
+				}
+			}
+
+			if title == "" {
+				return
+			}
+
+			// Get price
+			price := 0.0
+			priceSelectors := []string{
+				".a-price-whole",
+				".a-price .a-offscreen",
+				"span.a-price-whole",
+			}
+			for _, ps := range priceSelectors {
+				priceText := strings.TrimSpace(container.Find(ps).First().Text())
+				priceText = strings.TrimPrefix(priceText, "$")
+				priceText = strings.ReplaceAll(priceText, ",", "")
+				if p, err := strconv.ParseFloat(priceText, 64); err == nil && p > 0 {
+					price = p
+					break
+				}
+			}
+
+			// Get image URL
+			imageURL := ""
+			img := container.Find("img").First()
+			if src, ok := img.Attr("src"); ok && src != "" {
+				imageURL = src
+			} else if srcSet, ok := img.Attr("srcset"); ok && srcSet != "" {
+				// Extract first URL from srcset
+				parts := strings.Split(srcSet, ",")
+				if len(parts) > 0 {
+					imageURL = strings.Fields(parts[0])[0]
+				}
+			}
+
+			// Check for free shipping indicators
+			containerHTML, _ := goquery.OuterHtml(container)
+			freeShipping := strings.Contains(strings.ToLower(containerHTML), "free shipping") ||
+				strings.Contains(strings.ToLower(containerHTML), "free delivery")
+
+			// Only include products with valid data
+			if price > 0 && price < 10000 && title != "" {
+				alt := Alternative{
+					ASIN:         asin,
+					Title:        title,
+					URL:          fmt.Sprintf("https://amazon.com/dp/%s", asin),
+					ImageURL:     imageURL,
+					PriceUSD:     price,
+					FreeShipping: freeShipping,
+				}
+				alts = append(alts, alt)
+				log.Printf("[DEBUG] Scraper: found %s - %.0s... ($%.2f)", asin, title, price)
+			}
+		})
+
+		if len(alts) > 0 {
+			break // Stop trying selectors if we found results
+		}
+	}
+
+	log.Printf("[DEBUG] Scraper: extracted %d alternatives from %s", len(alts), searchURL)
+	return alts, nil
+}
+
+// generateDemoAlternatives creates demo alternatives for testing without external APIs
+func generateDemoAlternatives(productTitle string, productASIN string) []Alternative {
+	demoProducts := []struct {
+		asin     string
+		title    string
+		price    float64
+		imageURL string
+	}{
+		{
+			"B0B8QXKQHV",
+			"Full Spectrum LED Plant Grow Light with Timer",
+			74.99,
+			"https://picsum.photos/300/300?random=1",
+		},
+		{
+			"B09YT3V8NZ",
+			"Professional Horticultural Grow Lamp 2000W",
+			129.99,
+			"https://picsum.photos/300/300?random=2",
+		},
+		{
+			"B0BJ4QXLKM",
+			"Compact Desk Plant Light with Auto Timer",
+			45.99,
+			"https://picsum.photos/300/300?random=3",
+		},
+		{
+			"B0CQ8RLTXX",
+			"Adjustable LED Grow Light Bar 150W",
+			59.99,
+			"https://picsum.photos/300/300?random=4",
+		},
+		{
+			"B0CX5LQQ2K",
+			"Advanced Multi-Spectrum Grow Light Panel",
+			89.99,
+			"https://picsum.photos/300/300?random=5",
+		},
+	}
+
+	var alts []Alternative
+	for _, p := range demoProducts {
+		alts = append(alts, Alternative{
+			ASIN:         p.asin,
+			Title:        p.title,
+			URL:          fmt.Sprintf("https://amazon.com/dp/%s", p.asin),
+			ImageURL:     p.imageURL,
+			PriceUSD:     p.price,
+			FreeShipping: true,
+		})
+	}
+	return alts
+}
+
+// europeanAmazonCountries maps European countries that have Amazon stores and ship to Israel
+var europeanAmazonCountries = []struct {
+	code     string
+	domain   string
+	currency string
+}{
+	{"DE", "amazon.de", "EUR"},   // Germany - best for Israel shipping
+	{"UK", "amazon.co.uk", "GBP"}, // UK - good coverage
+	{"NL", "amazon.nl", "EUR"},   // Netherlands
+	{"FR", "amazon.fr", "EUR"},   // France
+}
+
+// checkEuropeanAlternative checks if product has free shipping in a European country
+// when it doesn't have it in Israel
+func (s *Service) checkEuropeanAlternative(ctx context.Context, url, ilZip string) (Result, error) {
+	// Try to get ASIN from URL
+	asin := extractASINFromURL(url)
+	if asin == "" {
+		return Result{}, fmt.Errorf("could not extract ASIN")
+	}
+
+	log.Printf("[DEBUG] Checking European alternatives for ASIN %s", asin)
+
+	// Try each European country
+	for _, country := range europeanAmazonCountries {
+		// Build Amazon Europe URL
+		euroURL := fmt.Sprintf("https://%s/dp/%s", country.domain, asin)
+
+		// Use Decodo to check
+		if res, err := s.decodoAnalyze(ctx, euroURL, country.code, ""); err == nil && res.FreeShippingCountry {
+			log.Printf("[DEBUG] Found free shipping in %s", country.code)
+			res.Signal = fmt.Sprintf("eu_alternative|%s_free_shipping", country.code)
+			return res, nil
+		}
+
+		// Fall back to HTTP
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, euroURL, nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+
+		resp, err := s.Client.Do(req)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
+		res := AnalyzeHTML(euroURL, country.code, string(body))
+
+		if res.FreeShippingCountry {
+			log.Printf("[DEBUG] Found free shipping in %s via HTTP", country.code)
+			res.Signal = fmt.Sprintf("eu_alternative|%s_free_shipping", country.code)
+			return res, nil
+		}
+	}
+
+	return Result{}, fmt.Errorf("no EU countries with free shipping found")
+}
+
 func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Result, error) {
 	return s.CheckURLWithMethod(ctx, url, country, zip, s.FetchMethod)
 }
@@ -55,7 +487,7 @@ func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, met
 	// 1. Try Decodo API first (preferred method) — trust its result when it succeeds
 	if method != "http" {
 		if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
-			return dres, nil
+			return s.enrichWithAlternatives(ctx, dres)
 		}
 		// Decodo failed (API error, no auth, etc.) — fall through to HTTP/browser
 	}
@@ -90,14 +522,23 @@ func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, met
 	// 3. Fallback: headless browser
 	browserRes, berr := s.browserAnalyze(ctx, url, country, zip)
 	if berr == nil {
-		return browserRes, nil
+		return s.enrichWithAlternatives(ctx, browserRes)
 	}
 	errMsg := strings.ReplaceAll(berr.Error(), " ", "_")
 	if len(errMsg) > 80 {
 		errMsg = errMsg[:80]
 	}
 	res.Signal = res.Signal + "|browser_unavailable:" + errMsg
-	return res, nil
+
+	// If Israel has no free shipping, try European alternatives
+	if strings.ToUpper(country) == "IL" && !res.FreeShippingCountry {
+		if euRes, err := s.checkEuropeanAlternative(ctx, url, zip); err == nil {
+			log.Printf("[DEBUG] Using European alternative instead of IL")
+			return s.enrichWithAlternatives(ctx, euRes)
+		}
+	}
+
+	return s.enrichWithAlternatives(ctx, res)
 }
 
 // AnalyzeHTML analyzes the provided HTML for pricing, shipping signals and basic product metadata.

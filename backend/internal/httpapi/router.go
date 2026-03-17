@@ -16,9 +16,11 @@ import (
 // NewRouter constructs and returns an http.Handler that serves the application's HTTP API.
 // It registers endpoints for health checks, URL checking, monitoring, user panel (v1/me) and admin actions,
 // and wires the checker, monitor, userpanel, and admin services used by those routes.
-func NewRouter() http.Handler {
+// altCache can be nil, in which case caching is disabled.
+func NewRouter(altCache interface{}) http.Handler {
 	mux := http.NewServeMux()
 	svc := checker.New()
+	svc.AltCache = altCache
 	msvc := monitor.New(svc)
 	usvc := userpanel.New(svc)
 	asvc := admin.NewService(msvc, usvc)
@@ -305,6 +307,27 @@ func NewRouter() http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "action": "retry_failed_notifications", "processed": processed})
 	})
+
+	// Alternative cache metrics endpoint
+	if altCache != nil {
+		mux.HandleFunc("/v1/admin/altcache/metrics", func(w http.ResponseWriter, r *http.Request) {
+			if !requireAdmin(r, w) {
+				return
+			}
+			if r.Method != http.MethodGet {
+				methodNotAllowed(w, http.MethodGet)
+				return
+			}
+			// Call Snapshot() method on cache if it exists
+			if snapper, ok := altCache.(interface {
+				Snapshot() interface{}
+			}); ok {
+				writeJSON(w, http.StatusOK, snapper.Snapshot())
+			} else {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "cache snapshot unavailable"})
+			}
+		})
+	}
 
 	return mux
 }

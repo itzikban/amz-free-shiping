@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 
 type FormState = {
   url: string;
-  country: "US" | "IL";
+  country: "US" | "IL" | "MT" | "CY";
   zip: string;
 };
 
@@ -33,6 +33,7 @@ export default function HomePage() {
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
+    // Only US requires ZIP code
     if (form.country === "US" && !form.zip.trim()) return false;
     return true;
   }, [form]);
@@ -82,6 +83,7 @@ export default function HomePage() {
           url: submittedForm.url,
           country: submittedForm.country,
           zip: submittedForm.country === "US" ? submittedForm.zip : "",
+          // MT and CY don't need ZIP
         }),
       });
       if (!res.ok) {
@@ -97,11 +99,36 @@ export default function HomePage() {
     }
   }
 
-  const recommendations = [
+  const mockRecommendations = [
     { id: 1, titleKey: "rec_title_1", price: "$345", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-1" },
     { id: 2, titleKey: "rec_title_2", price: "$348", tagKey: "rec_tag_best_match", cls: "img-placeholder-2" },
     { id: 3, titleKey: "rec_title_3", price: "$429", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-3" },
   ] as const;
+
+  type RecommendationCard = {
+    id: number;
+    type: "mock" | "real";
+    price: string;
+  } & (
+    | { type: "mock"; titleKey: string; cls: string }
+    | { type: "real"; title: string; imageUrl?: string }
+  );
+
+  const recommendations: RecommendationCard[] = result?.alternatives && result.alternatives.length > 0
+    ? result.alternatives.map((alt, i) => ({
+        id: i + 1,
+        type: "real" as const,
+        title: alt.title,
+        price: alt.price_usd ? `$${alt.price_usd.toFixed(2)}` : "N/A",
+        imageUrl: alt.image_url,
+      }))
+    : mockRecommendations.map((r) => ({
+        id: r.id,
+        type: "mock" as const,
+        titleKey: r.titleKey,
+        price: r.price,
+        cls: r.cls,
+      }));
 
   return (
     <main className="container nexusHome">
@@ -129,10 +156,12 @@ export default function HomePage() {
               id="destination-country"
               className="clean-input"
               value={form.country}
-              onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" }))}
+              onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" | "MT" | "CY" }))}
             >
               <option value="IL">{t("home_country_il")}</option>
               <option value="US">{t("home_country_us")}</option>
+              <option value="MT">Malta (MT)</option>
+              <option value="CY">Cyprus (CY)</option>
             </select>
           </div>
 
@@ -147,6 +176,14 @@ export default function HomePage() {
                 onChange={(e) => setForm((x) => ({ ...x, zip: e.target.value }))}
                 placeholder={t("home_zip_placeholder")}
               />
+            </div>
+          )}
+
+          {(form.country === "MT" || form.country === "CY") && (
+            <div className="search-row fixed">
+              <span className="clean-input" style={{ color: "#666", pointerEvents: "none" }}>
+                {form.country === "MT" ? "🇲🇹 Malta" : "🇨🇾 Cyprus"}
+              </span>
             </div>
           )}
 
@@ -203,13 +240,21 @@ export default function HomePage() {
           <section className="recommendGrid animate-flow-3">
             {recommendations.map((r) => (
               <article key={r.id} className="fluid-card recCard">
-                <div className={`recImage ${r.cls}`} />
-                <h4>{t(r.titleKey)}</h4>
+                {r.type === "mock" ? (
+                  <div className={`recImage ${r.cls}`} />
+                ) : (
+                  r.imageUrl ? (
+                    <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} />
+                  ) : (
+                    <div className="recImage img-placeholder-1" />
+                  )
+                )}
+                <h4>{r.type === "mock" ? t(r.titleKey) : r.title}</h4>
                 <div className="recMeta">
                   <strong>{r.price}</strong>
                   <div className="chipRow">
-                    <span className="signalPill neutral">{t("home_demo_label")}</span>
-                    <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
+                    {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
+                    <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
                   </div>
                 </div>
               </article>
