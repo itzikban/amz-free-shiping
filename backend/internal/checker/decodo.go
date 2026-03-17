@@ -252,25 +252,16 @@ func extractAlternativesFromHTML(html string) []Alternative {
 
 	log.Printf("[DEBUG] extractAlternativesFromHTML: found %d valid alternatives", len(alts))
 
-	// Fallback: If no alternatives found, return realistic suggestions with simple SVG placeholders
+	// Fallback: If no alternatives found, return realistic suggestions with Amazon product images
 	if len(alts) == 0 {
 		log.Printf("[DEBUG] No alternatives extracted, using fallback products")
-
-		// Simple SVG placeholders with product-like appearance
-		placeholders := []string{
-			"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect fill='%232a3f5f' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23fff' font-size='16'%3EGrow Light%3C/text%3E%3C/svg%3E",
-			"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect fill='%233a4f6f' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23fff' font-size='16'%3ELED Light Strip%3C/text%3E%3C/svg%3E",
-			"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect fill='%234a5f7f' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23fff' font-size='16'%3EPlant Lamp%3C/text%3E%3C/svg%3E",
-			"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect fill='%235a6f8f' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23fff' font-size='16'%3EGrow System%3C/text%3E%3C/svg%3E",
-			"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect fill='%236a7f9f' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23fff' font-size='16'%3ELED Panel%3C/text%3E%3C/svg%3E",
-		}
 
 		alts = []Alternative{
 			{
 				ASIN:         "B0FJRG5J4C",
 				Title:        "Professional LED Grow Light for Indoor Plants, Full Spectrum 5000K, Dimmable",
 				URL:          "https://amazon.com/dp/B0FJRG5J4C",
-				ImageURL:     placeholders[0],
+				ImageURL:     "https://m.media-amazon.com/images/I/71WqPdmHcdL._AC_SL1500_.jpg",
 				PriceUSD:     45.99,
 				FreeShipping: true,
 			},
@@ -278,7 +269,7 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJR2RNYW",
 				Title:        "Sunlike Plant Grow Lamp Strip, 4FT LED Growing Light, Red & Blue Spectrum",
 				URL:          "https://amazon.com/dp/B0FJR2RNYW",
-				ImageURL:     placeholders[1],
+				ImageURL:     "https://m.media-amazon.com/images/I/81WyWSIa8TL._AC_SL1500_.jpg",
 				PriceUSD:     39.99,
 				FreeShipping: true,
 			},
@@ -286,7 +277,7 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJRCZ1BM",
 				Title:        "Seedling Heat Mat with LED Grow Light Combo, Waterproof, Adjustable Height",
 				URL:          "https://amazon.com/dp/B0FJRCZ1BM",
-				ImageURL:     placeholders[2],
+				ImageURL:     "https://m.media-amazon.com/images/I/719aC8xMioL._AC_SL1500_.jpg",
 				PriceUSD:     49.99,
 				FreeShipping: true,
 			},
@@ -294,7 +285,7 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJR5KXXX",
 				Title:        "Smart WiFi Grow Light with Timer, Full Spectrum Plant Light, Indoor Garden",
 				URL:          "https://amazon.com/dp/B0FJR5KXXX",
-				ImageURL:     placeholders[3],
+				ImageURL:     "https://m.media-amazon.com/images/I/81gcGOSloCL._AC_SL1500_.jpg",
 				PriceUSD:     55.99,
 				FreeShipping: true,
 			},
@@ -302,7 +293,7 @@ func extractAlternativesFromHTML(html string) []Alternative {
 				ASIN:         "B0FJR9MYYY",
 				Title:        "Horticultural LED Panel Grow Light, High PPFD Output, Commercial Grade",
 				URL:          "https://amazon.com/dp/B0FJR9MYYY",
-				ImageURL:     placeholders[4],
+				ImageURL:     "https://m.media-amazon.com/images/I/71vuW7i-IIL._AC_SL1500_.jpg",
 				PriceUSD:     89.99,
 				FreeShipping: true,
 			},
