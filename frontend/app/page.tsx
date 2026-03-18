@@ -38,6 +38,15 @@ export default function HomePage() {
     return true;
   }, [form]);
 
+  const isValidHttpUrl = (value: string): boolean => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
@@ -83,7 +92,6 @@ export default function HomePage() {
           url: submittedForm.url,
           country: submittedForm.country,
           zip: submittedForm.country === "US" ? submittedForm.zip : "",
-          // MT and CY don't need ZIP
         }),
       });
       if (!res.ok) {
@@ -105,12 +113,14 @@ export default function HomePage() {
     { id: 3, titleKey: "rec_title_3", price: "$429", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-3" },
   ] as const;
 
+  type MockRecommendation = (typeof mockRecommendations)[number];
+
   type RecommendationCard = {
     id: number;
     type: "mock" | "real";
     price: string;
   } & (
-    | { type: "mock"; titleKey: string; cls: string }
+    | { type: "mock"; titleKey: MockRecommendation["titleKey"]; tagKey: MockRecommendation["tagKey"]; cls: string }
     | { type: "real"; title: string; imageUrl?: string; url?: string }
   );
 
@@ -127,6 +137,7 @@ export default function HomePage() {
         id: r.id,
         type: "mock" as const,
         titleKey: r.titleKey,
+        tagKey: r.tagKey,
         price: r.price,
         cls: r.cls,
       }));
@@ -161,7 +172,7 @@ export default function HomePage() {
             >
               <option value="IL">{t("home_country_il")}</option>
               <option value="US">{t("home_country_us")}</option>
-              <option value="NL">🇳🇱 Netherlands (NL)</option>
+              <option value="NL">{t("home_country_nl")}</option>
             </select>
           </div>
 
@@ -247,13 +258,13 @@ export default function HomePage() {
                     <strong>{r.price}</strong>
                     <div className="chipRow">
                       {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
-                      <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
+                      <span className="signalPill ok">{r.type === "mock" ? t(r.tagKey) : t("rec_tag_free_shipping")}</span>
                     </div>
                   </div>
                 </>
               );
 
-              return r.type === "real" && r.url ? (
+              return r.type === "real" && r.url && isValidHttpUrl(r.url) ? (
                 <a
                   key={r.id}
                   href={r.url}
