@@ -19,6 +19,11 @@ type MetricsSnapshot struct {
 	HitRate float64 `json:"hit_rate_pct"`
 }
 
+// Snapshotter defines the cache metrics interface for HTTP/API consumers.
+type Snapshotter interface {
+	Snapshot() MetricsSnapshot
+}
+
 // Snapshot returns a point-in-time view of cache metrics.
 func (c *Cache) Snapshot() MetricsSnapshot {
 	l1 := atomic.LoadInt64(&c.Metrics.L1Hits)

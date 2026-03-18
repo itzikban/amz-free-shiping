@@ -36,10 +36,11 @@ func main() {
 	endpoint := "https://webservices.amazon.com/paapi5/searchitems"
 
 	// Build request body
-	searchBody := map[string]interface{}{
+	searchBody := map[string]any{
 		"Keywords":    "wireless headphones",
 		"ItemCount":   3,
 		"PartnerTag":  associateTag,
+		"PartnerType": "Associates",
 		"Resources": []string{
 			"Images.Primary.Medium",
 			"ItemInfo.Title",
@@ -145,7 +146,7 @@ func main() {
 		return
 	}
 
-	var result interface{}
+	var result any
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		fmt.Printf("Raw response:\n%s\n", string(respBody))
 	} else {

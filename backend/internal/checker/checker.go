@@ -354,7 +354,7 @@ func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery stri
 					FreeShipping: freeShipping,
 				}
 				alts = append(alts, alt)
-				log.Printf("[DEBUG] Scraper: found %s - %.0s... ($%.2f)", asin, title, price)
+				log.Printf("[DEBUG] Scraper: found %s - %.60s... ($%.2f)", asin, title, price)
 			}
 		})
 
@@ -428,7 +428,7 @@ var europeanAmazonCountries = []struct {
 	currency string
 }{
 	{"DE", "amazon.de", "EUR"},   // Germany - best for Israel shipping
-	{"UK", "amazon.co.uk", "GBP"}, // UK - good coverage
+	{"GB", "amazon.co.uk", "GBP"}, // United Kingdom - good coverage
 	{"NL", "amazon.nl", "EUR"},   // Netherlands
 	{"FR", "amazon.fr", "EUR"},   // France
 }

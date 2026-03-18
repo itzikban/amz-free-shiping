@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"free-ship-checker-go/internal/admin"
+	"free-ship-checker-go/internal/altcache"
 	"free-ship-checker-go/internal/checker"
 	"free-ship-checker-go/internal/monitor"
 	"free-ship-checker-go/internal/userpanel"
@@ -319,9 +320,7 @@ func NewRouter(altCache interface{}) http.Handler {
 				return
 			}
 			// Call Snapshot() method on cache if it exists
-			if snapper, ok := altCache.(interface {
-				Snapshot() interface{}
-			}); ok {
+			if snapper, ok := altCache.(altcache.Snapshotter); ok {
 				writeJSON(w, http.StatusOK, snapper.Snapshot())
 			} else {
 				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "cache snapshot unavailable"})

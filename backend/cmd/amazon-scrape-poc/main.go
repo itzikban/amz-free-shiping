@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -94,7 +95,7 @@ func searchAmazon(query string, maxResults int) ([]ScrapedProduct, error) {
 	}
 
 	// Parse HTML
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("parse html: %w", err)
 	}
@@ -252,7 +253,7 @@ func fetchShippingInfo(p *ScrapedProduct) {
 		return
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		return
 	}

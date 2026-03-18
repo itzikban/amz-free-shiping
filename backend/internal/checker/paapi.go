@@ -79,10 +79,11 @@ func (c *PAAClient) SearchItems(ctx context.Context, keywords string, itemCount 
 	service := "ProductAdvertisingAPI"
 
 	// Build request body
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"Keywords":    keywords,
 		"ItemCount":   itemCount,
 		"PartnerTag":  c.AssociateTag,
+		"PartnerType": "Associates",
 		"Resources": []string{
 			"Images.Primary.Medium",
 			"ItemInfo.Title",
