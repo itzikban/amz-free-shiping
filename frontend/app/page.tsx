@@ -201,7 +201,12 @@ export default function HomePage() {
     ? rankedFillCandidates
     : [];
 
-  const bestFillCombo = fillToThresholdResult?.combos?.[0] ?? null;
+  const bestFillCombo = useMemo(() => {
+    if (!fillToThresholdResult?.combos?.length) return null;
+    return fillToThresholdResult.combos.find((combo) => combo.items.length === 2)
+      ?? fillToThresholdResult.combos.find((combo) => combo.items.length >= 2)
+      ?? null;
+  }, [fillToThresholdResult?.combos]);
 
   return (
     <main className="container nexusHome">
