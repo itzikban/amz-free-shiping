@@ -26,8 +26,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Access Key: %s\n", accessKey[:10]+"...")
-	fmt.Printf("Associate Tag: %s\n\n", associateTag)
+	fmt.Println("Credentials loaded from environment (redacted)")
+	fmt.Println()
 
 	// PA-API endpoint
 	host := "webservices.amazon.com"
@@ -66,6 +66,7 @@ func main() {
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("X-Amz-Target", "ProductAdvertisingAPI5.SearchItems")
 	req.Header.Set("Host", host)
 
 	// Sign request with AWS Signature v4
@@ -77,15 +78,16 @@ func main() {
 	payloadHash := sha256Hash(bodyBytes)
 
 	// Headers to sign (sorted)
-	signedHeaders := []string{"content-type", "host", "x-amz-date"}
+	signedHeaders := []string{"content-type", "host", "x-amz-date", "x-amz-target"}
 	sort.Strings(signedHeaders)
 	signedHeadersStr := strings.Join(signedHeaders, ";")
 
 	canonicalHeaders := fmt.Sprintf(
-		"content-type:%s\nhost:%s\nx-amz-date:%s\n",
+		"content-type:%s\nhost:%s\nx-amz-date:%s\nx-amz-target:%s\n",
 		req.Header.Get("Content-Type"),
 		host,
 		amzDate,
+		req.Header.Get("X-Amz-Target"),
 	)
 
 	canonicalRequest := fmt.Sprintf(
@@ -121,7 +123,8 @@ func main() {
 	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("X-Amz-Date", amzDate)
 
-	fmt.Printf("Authorization Header: %s\n\n", authHeader)
+	fmt.Println("Authorization Header: <redacted>")
+	fmt.Println()
 
 	// Make request
 	client := &http.Client{Timeout: 10 * time.Second}

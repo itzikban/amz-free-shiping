@@ -457,16 +457,22 @@ func (s *Service) checkEuropeanAlternative(ctx context.Context, url, ilZip strin
 		}
 
 		// Fall back to HTTP
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, euroURL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, euroURL, nil)
+		if err != nil {
+			continue
+		}
 		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
 
 		resp, err := s.Client.Do(req)
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
 
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
+		resp.Body.Close()
+		if readErr != nil {
+			continue
+		}
 		res := AnalyzeHTML(euroURL, country.code, string(body))
 
 		if res.FreeShippingCountry {

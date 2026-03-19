@@ -121,7 +121,7 @@ export default function HomePage() {
     price: string;
   } & (
     | { type: "mock"; titleKey: MockRecommendation["titleKey"]; tagKey: MockRecommendation["tagKey"]; cls: string }
-    | { type: "real"; title: string; imageUrl?: string; url?: string }
+    | { type: "real"; title: string; imageUrl?: string; url?: string; freeShipping: boolean }
   );
 
   const recommendations: RecommendationCard[] = result?.alternatives && result.alternatives.length > 0
@@ -132,6 +132,7 @@ export default function HomePage() {
         price: alt.price_usd ? `$${alt.price_usd.toFixed(2)}` : "N/A",
         imageUrl: alt.image_url,
         url: alt.url,
+        freeShipping: alt.free_shipping,
       }))
     : mockRecommendations.map((r) => ({
         id: r.id,
@@ -258,7 +259,11 @@ export default function HomePage() {
                     <strong>{r.price}</strong>
                     <div className="chipRow">
                       {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
-                      <span className="signalPill ok">{r.type === "mock" ? t(r.tagKey) : t("rec_tag_free_shipping")}</span>
+                      {r.type === "mock" ? (
+                        <span className="signalPill ok">{t(r.tagKey)}</span>
+                      ) : (
+                        r.freeShipping && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
+                      )}
                     </div>
                   </div>
                 </>

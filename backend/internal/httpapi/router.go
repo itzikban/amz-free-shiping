@@ -310,7 +310,7 @@ func NewRouter(altCache interface{}) http.Handler {
 	})
 
 	// Alternative cache metrics endpoint
-	if altCache != nil {
+	if snapper, ok := altCache.(altcache.Snapshotter); ok {
 		mux.HandleFunc("/v1/admin/altcache/metrics", func(w http.ResponseWriter, r *http.Request) {
 			if !requireAdmin(r, w) {
 				return
@@ -319,12 +319,7 @@ func NewRouter(altCache interface{}) http.Handler {
 				methodNotAllowed(w, http.MethodGet)
 				return
 			}
-			// Call Snapshot() method on cache if it exists
-			if snapper, ok := altCache.(altcache.Snapshotter); ok {
-				writeJSON(w, http.StatusOK, snapper.Snapshot())
-			} else {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "cache snapshot unavailable"})
-			}
+			writeJSON(w, http.StatusOK, snapper.Snapshot())
 		})
 	}
 

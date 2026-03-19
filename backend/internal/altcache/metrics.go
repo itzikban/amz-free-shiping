@@ -26,6 +26,10 @@ type Snapshotter interface {
 
 // Snapshot returns a point-in-time view of cache metrics.
 func (c *Cache) Snapshot() MetricsSnapshot {
+	if c == nil || c.Metrics == nil {
+		return MetricsSnapshot{}
+	}
+
 	l1 := atomic.LoadInt64(&c.Metrics.L1Hits)
 	l2 := atomic.LoadInt64(&c.Metrics.L2Hits)
 	miss := atomic.LoadInt64(&c.Metrics.Misses)

@@ -38,6 +38,10 @@ func NewPAAClient() *PAAClient {
 
 // SearchItemsResponse models PA-API v5 response
 type SearchItemsResponse struct {
+	Errors []struct {
+		Code    string `json:"Code"`
+		Message string `json:"Message"`
+	} `json:"Errors"`
 	SearchResult struct {
 		Items []struct {
 			ASIN string `json:"ASIN"`
@@ -104,6 +108,8 @@ func (c *PAAClient) SearchItems(ctx context.Context, keywords string, itemCount 
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("Content-Encoding", "amz-1.0")
+	req.Header.Set("X-Amz-Target", "com.amazon.paapi5.v1.ProductAdvertisingAPIv1.SearchItems")
 	req.Header.Set("Host", host)
 
 	// Sign request with AWS Signature v4
@@ -129,6 +135,9 @@ func (c *PAAClient) SearchItems(ctx context.Context, keywords string, itemCount 
 	var result SearchItemsResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+	if len(result.Errors) > 0 {
+		return nil, fmt.Errorf("pa-api response error: %s: %s", result.Errors[0].Code, result.Errors[0].Message)
 	}
 
 	// Extract alternatives with free shipping only
@@ -166,15 +175,17 @@ func (c *PAAClient) signRequest(req *http.Request, bodyBytes []byte, host, servi
 	payloadHash := sha256Hash(bodyBytes)
 
 	// Canonical request
-	signedHeaders := []string{"content-type", "host", "x-amz-date"}
+	signedHeaders := []string{"content-encoding", "content-type", "host", "x-amz-date", "x-amz-target"}
 	sort.Strings(signedHeaders)
 	signedHeadersStr := strings.Join(signedHeaders, ";")
 
 	canonicalHeaders := fmt.Sprintf(
-		"content-type:%s\nhost:%s\nx-amz-date:%s\n",
+		"content-encoding:%s\ncontent-type:%s\nhost:%s\nx-amz-date:%s\nx-amz-target:%s\n",
+		req.Header.Get("Content-Encoding"),
 		req.Header.Get("Content-Type"),
 		host,
 		amzDate,
+		req.Header.Get("X-Amz-Target"),
 	)
 
 	canonicalRequest := fmt.Sprintf(

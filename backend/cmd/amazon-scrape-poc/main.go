@@ -183,7 +183,7 @@ func searchAmazon(query string, maxResults int) ([]ScrapedProduct, error) {
 			linkNode := s.Find("a.a-link-normal")
 			if href, ok := linkNode.Attr("href"); ok && href != "" {
 				if !strings.HasPrefix(href, "http") {
-					p.URL = "https://amazon.com" + href
+					p.URL = "https://www.amazon.com" + href
 				} else {
 					p.URL = href
 				}
@@ -280,14 +280,14 @@ func fetchShippingInfo(p *ScrapedProduct) {
 	}
 
 	// Try to find shipping info in specific elements
-	doc.Find("span, div").Each(func(_ int, s *goquery.Selection) {
+	doc.Find("span, div").EachWithBreak(func(_ int, s *goquery.Selection) bool {
 		text := strings.ToLower(strings.TrimSpace(s.Text()))
 
 		// Check for free shipping
 		if strings.Contains(text, "free shipping") || strings.Contains(text, "ships free") {
 			p.FreeShipUS = true
 			p.ShippingInfo = "Free shipping"
-			return
+			return false
 		}
 
 		// Check for paid shipping
@@ -295,9 +295,10 @@ func fetchShippingInfo(p *ScrapedProduct) {
 			parts := strings.Split(text, "shipping:")
 			if len(parts) > 1 {
 				p.ShippingInfo = strings.TrimSpace(parts[1])
-				return
+				return false
 			}
 		}
+		return true
 	})
 
 	// If no shipping info found, check for common patterns
