@@ -1,0 +1,141 @@
+package checker
+
+import (
+	"sort"
+)
+
+// FillSuggestion describes a single add-on recommendation for crossing a shipping threshold.
+type FillSuggestion struct {
+	ASIN             string  `json:"asin"`
+	Title            string  `json:"title"`
+	PriceUSD         float64 `json:"price_usd"`
+	ImageURL         string  `json:"image_url,omitempty"`
+	URL              string  `json:"url"`
+	FreeShippingHint bool    `json:"free_shipping_hint"`
+	Score            float64 `json:"score"`
+}
+
+// FillCombo describes a small multi-item recommendation (2-3 items).
+type FillCombo struct {
+	Items []FillSuggestion `json:"items"`
+	Total float64          `json:"total"`
+	Score float64          `json:"score"`
+}
+
+// FillToThresholdResponse is the payload returned by /api/v1/fill-to-threshold.
+type FillToThresholdResponse struct {
+	CurrentPrice  float64          `json:"current_price"`
+	MissingAmount float64          `json:"missing_amount"`
+	Suggestions   []FillSuggestion `json:"suggestions"`
+	Combos        []FillCombo      `json:"combos"`
+}
+
+// BuildFillToThreshold calculates ranked single-item and combo suggestions.
+func BuildFillToThreshold(currentPrice, threshold float64, alternatives []Alternative) FillToThresholdResponse {
+	missing := threshold - currentPrice
+	if missing < 0 {
+		missing = 0
+	}
+
+	suggestions := make([]FillSuggestion, 0, len(alternatives))
+	for _, alt := range alternatives {
+		if alt.PriceUSD <= 0 || alt.PriceUSD > threshold {
+			continue
+		}
+		suggestions = append(suggestions, FillSuggestion{
+			ASIN:             alt.ASIN,
+			Title:            alt.Title,
+			PriceUSD:         alt.PriceUSD,
+			ImageURL:         alt.ImageURL,
+			URL:              alt.URL,
+			FreeShippingHint: alt.FreeShipping,
+			Score:            scoreCandidate(alt.PriceUSD, missing, alt.FreeShipping),
+		})
+	}
+
+	sort.SliceStable(suggestions, func(i, j int) bool {
+		if suggestions[i].Score == suggestions[j].Score {
+			return suggestions[i].PriceUSD < suggestions[j].PriceUSD
+		}
+		return suggestions[i].Score < suggestions[j].Score
+	})
+
+	combos := buildCombos(suggestions, missing)
+
+	return FillToThresholdResponse{
+		CurrentPrice:  currentPrice,
+		MissingAmount: missing,
+		Suggestions:   suggestions,
+		Combos:        combos,
+	}
+}
+
+func buildCombos(suggestions []FillSuggestion, missing float64) []FillCombo {
+	combos := make([]FillCombo, 0)
+	maxN := len(suggestions)
+	if maxN > 6 {
+		maxN = 6
+	}
+
+	for i := 0; i < maxN; i++ {
+		for j := i + 1; j < maxN; j++ {
+			items := []FillSuggestion{suggestions[i], suggestions[j]}
+			combos = append(combos, scoreCombo(items, missing))
+			for k := j + 1; k < maxN; k++ {
+				items3 := []FillSuggestion{suggestions[i], suggestions[j], suggestions[k]}
+				combos = append(combos, scoreCombo(items3, missing))
+			}
+		}
+	}
+
+	sort.SliceStable(combos, func(i, j int) bool {
+		if combos[i].Score == combos[j].Score {
+			return combos[i].Total < combos[j].Total
+		}
+		return combos[i].Score < combos[j].Score
+	})
+	if len(combos) > 5 {
+		return combos[:5]
+	}
+	return combos
+}
+
+func scoreCombo(items []FillSuggestion, missing float64) FillCombo {
+	total := 0.0
+	freeCount := 0
+	for _, it := range items {
+		total += it.PriceUSD
+		if it.FreeShippingHint {
+			freeCount++
+		}
+	}
+	distance := abs(total - missing)
+	overSpend := max(0, total-missing)
+	shippingBonus := float64(freeCount) * 0.5
+	score := distance + (overSpend * 1.5) - shippingBonus
+	return FillCombo{Items: items, Total: total, Score: score}
+}
+
+func scoreCandidate(price, missing float64, freeShipping bool) float64 {
+	distance := abs(price - missing)
+	overSpend := max(0, price-missing)
+	shippingBonus := 0.0
+	if freeShipping {
+		shippingBonus = 1.5
+	}
+	return distance + (overSpend * 2) - shippingBonus
+}
+
+func abs(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func max(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}

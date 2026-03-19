@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"free-ship-checker-go/internal/admin"
@@ -53,6 +54,39 @@ func NewRouter(altCache checker.AltCache) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
+	})
+
+	mux.HandleFunc("/api/v1/fill-to-threshold", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing url query param"})
+			return
+		}
+		country := r.URL.Query().Get("country")
+		zip := r.URL.Query().Get("zip")
+		threshold := 50.0
+		if raw := strings.TrimSpace(r.URL.Query().Get("threshold")); raw != "" {
+			v, err := strconv.ParseFloat(raw, 64)
+			if err != nil || v <= 0 {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "threshold must be a positive number"})
+				return
+			}
+			threshold = v
+		}
+
+		res, err := svc.CheckURLWithMethod(r.Context(), url, country, zip, r.URL.Query().Get("method"))
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+			return
+		}
+
+		payload := checker.BuildFillToThreshold(res.PriceUSD, threshold, res.Alternatives)
+		writeJSON(w, http.StatusOK, payload)
 	})
 
 	mux.HandleFunc("/monitor/start", func(w http.ResponseWriter, r *http.Request) {
