@@ -205,7 +205,16 @@ export default function HomePage() {
 
   const fillToThresholdSuggestions = rankedFillCandidates.length > 0
     ? rankedFillCandidates
-    : fallbackFillToThresholdSuggestions.slice(0, 2);
+    : fallbackFillToThresholdSuggestions.slice(0, 2).map((fallback, idx) => {
+        const alt = result?.alternatives?.[idx];
+        if (!alt) return fallback;
+        return {
+          ...fallback,
+          imageUrl: alt.image_url || fallback.imageUrl,
+          url: alt.url || fallback.url,
+          freeShipping: alt.free_shipping,
+        };
+      });
 
   const bestFillCombo = fillToThresholdResult?.combos?.[0] ?? null;
 
