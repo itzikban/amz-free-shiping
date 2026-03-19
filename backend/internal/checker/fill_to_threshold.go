@@ -55,7 +55,12 @@ func BuildFillToThreshold(currentPrice, threshold float64, alternatives []Altern
 
 	sort.SliceStable(suggestions, func(i, j int) bool {
 		if suggestions[i].Score == suggestions[j].Score {
-			return suggestions[i].PriceUSD < suggestions[j].PriceUSD
+			iGap := abs(suggestions[i].PriceUSD - missing)
+			jGap := abs(suggestions[j].PriceUSD - missing)
+			if iGap == jGap {
+				return suggestions[i].PriceUSD < suggestions[j].PriceUSD
+			}
+			return iGap < jGap
 		}
 		return suggestions[i].Score < suggestions[j].Score
 	})
@@ -90,7 +95,12 @@ func buildCombos(suggestions []FillSuggestion, missing float64) []FillCombo {
 
 	sort.SliceStable(combos, func(i, j int) bool {
 		if combos[i].Score == combos[j].Score {
-			return combos[i].Total < combos[j].Total
+			iGap := abs(combos[i].Total - missing)
+			jGap := abs(combos[j].Total - missing)
+			if iGap == jGap {
+				return combos[i].Total < combos[j].Total
+			}
+			return iGap < jGap
 		}
 		return combos[i].Score < combos[j].Score
 	})
