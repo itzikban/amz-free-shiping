@@ -147,10 +147,17 @@ func (c *PAAClient) SearchItems(ctx context.Context, keywords string, itemCount 
 			continue
 		}
 
-		listing := item.Offers.Listings[0]
-		if !listing.DeliveryInfo.IsFreeShippingEligible {
+		selectedIdx := -1
+		for i, listing := range item.Offers.Listings {
+			if listing.DeliveryInfo.IsFreeShippingEligible {
+				selectedIdx = i
+				break
+			}
+		}
+		if selectedIdx == -1 {
 			continue
 		}
+		listing := item.Offers.Listings[selectedIdx]
 
 		alt := Alternative{
 			ASIN:         item.ASIN,

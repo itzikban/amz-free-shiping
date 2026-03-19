@@ -287,7 +287,6 @@ func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery stri
 			if seenASINs[asin] {
 				return
 			}
-			seenASINs[asin] = true
 
 			// Get title - try multiple selectors
 			title := ""
@@ -345,6 +344,7 @@ func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery stri
 
 			// Only include products with valid data
 			if price > 0 && price < 10000 && title != "" {
+				seenASINs[asin] = true
 				alt := Alternative{
 					ASIN:         asin,
 					Title:        title,
@@ -493,7 +493,10 @@ func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, met
 	// 1. Try Decodo API first (preferred method) — trust its result when it succeeds
 	if method != "http" {
 		if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
-			return s.enrichWithAlternatives(ctx, dres)
+			if dres.FreeShippingCountry {
+				return s.enrichWithAlternatives(ctx, dres)
+			}
+			// Decodo succeeded but not free for destination; continue to fallback checks (HTTP/browser/EU).
 		}
 		// Decodo failed (API error, no auth, etc.) — fall through to HTTP/browser
 	}
@@ -528,13 +531,18 @@ func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, met
 	// 3. Fallback: headless browser
 	browserRes, berr := s.browserAnalyze(ctx, url, country, zip)
 	if berr == nil {
-		return s.enrichWithAlternatives(ctx, browserRes)
+		if browserRes.FreeShippingCountry {
+			return s.enrichWithAlternatives(ctx, browserRes)
+		}
+		// Browser succeeded but still not free for destination; keep fallback path active.
+		res = browserRes
+	} else {
+		errMsg := strings.ReplaceAll(berr.Error(), " ", "_")
+		if len(errMsg) > 80 {
+			errMsg = errMsg[:80]
+		}
+		res.Signal = res.Signal + "|browser_unavailable:" + errMsg
 	}
-	errMsg := strings.ReplaceAll(berr.Error(), " ", "_")
-	if len(errMsg) > 80 {
-		errMsg = errMsg[:80]
-	}
-	res.Signal = res.Signal + "|browser_unavailable:" + errMsg
 
 	// If Israel has no free shipping, try European alternatives
 	if strings.ToUpper(country) == "IL" && !res.FreeShippingCountry {
@@ -564,7 +572,11 @@ func AnalyzeHTML(url, country, html string) Result {
 
 	countryPatterns := map[string][]string{
 		"IL": {"free shipping to israel", "eligible for free shipping to israel", "free delivery to israel"},
-		"US": {"free shipping to united states", "free shipping to the united states", "free delivery to united states"},
+		"US": {"free shipping to united states", "free shipping to the united states", "free delivery to united states", "ships to united states"},
+		"DE": {"kostenlose lieferung", "gratis lieferung", "versandkostenfrei", "lieferung nach deutschland"},
+		"GB": {"free delivery to the uk", "free shipping to the uk", "delivery to united kingdom"},
+		"NL": {"gratis verzending", "kosteloze levering", "levering naar nederland"},
+		"FR": {"livraison gratuite", "expédition gratuite", "livraison en france"},
 	}
 	freeGeneralPatterns := []string{
 		"free shipping",
@@ -621,7 +633,7 @@ func AnalyzeHTML(url, country, html string) Result {
 	// Small DOM fallback for common selectors.
 	if docErr == nil {
 		txt := strings.ToLower(strings.TrimSpace(doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE").Text()))
-		if strings.Contains(txt, "free") {
+		if strings.Contains(txt, "free") || strings.Contains(txt, "kosten") || strings.Contains(txt, "gratis") || strings.Contains(txt, "livraison") {
 			if country == "IL" && strings.Contains(txt, "israel") {
 				res.FreeShippingCountry = true
 				res.FreeShipping = true
@@ -629,6 +641,30 @@ func AnalyzeHTML(url, country, html string) Result {
 				return res
 			}
 			if country == "US" && strings.Contains(txt, "united states") {
+				res.FreeShippingCountry = true
+				res.FreeShipping = true
+				res.Signal = "delivery_block_primary"
+				return res
+			}
+			if country == "DE" && strings.Contains(txt, "deutschland") {
+				res.FreeShippingCountry = true
+				res.FreeShipping = true
+				res.Signal = "delivery_block_primary"
+				return res
+			}
+			if country == "GB" && (strings.Contains(txt, "united kingdom") || strings.Contains(txt, "uk")) {
+				res.FreeShippingCountry = true
+				res.FreeShipping = true
+				res.Signal = "delivery_block_primary"
+				return res
+			}
+			if country == "NL" && strings.Contains(txt, "nederland") {
+				res.FreeShippingCountry = true
+				res.FreeShipping = true
+				res.Signal = "delivery_block_primary"
+				return res
+			}
+			if country == "FR" && strings.Contains(txt, "france") {
 				res.FreeShippingCountry = true
 				res.FreeShipping = true
 				res.Signal = "delivery_block_primary"
