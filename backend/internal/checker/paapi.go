@@ -77,6 +77,9 @@ func (c *PAAClient) SearchItems(ctx context.Context, keywords string, itemCount 
 	if c.AccessKeyID == "" || c.SecretKey == "" || c.AssociateTag == "" {
 		return nil, fmt.Errorf("missing AWS credentials")
 	}
+	if itemCount < 1 || itemCount > 10 {
+		return nil, fmt.Errorf("itemCount must be between 1 and 10, got %d", itemCount)
+	}
 
 	endpoint := "https://webservices.amazon.com/paapi5/searchitems"
 	host := "webservices.amazon.com"
