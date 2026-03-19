@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { CheckResponse, FillToThresholdResponse } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 
@@ -168,6 +168,7 @@ export default function HomePage() {
         price: s.price_usd,
         score: s.score,
         freeShipping: s.free_shipping_hint,
+        url: s.url,
       }));
     }
 
@@ -187,6 +188,7 @@ export default function HomePage() {
           price,
           score,
           freeShipping: alt.free_shipping,
+          url: alt.url,
         };
       })
       .sort((a, b) => a.score - b.score)
@@ -194,14 +196,16 @@ export default function HomePage() {
   }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
   const fallbackFillToThresholdSuggestions = [
-    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
-    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99 },
-    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99 },
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined },
   ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
 
   const fillToThresholdSuggestions = rankedFillCandidates.length > 0
     ? rankedFillCandidates
     : fallbackFillToThresholdSuggestions.slice(0, 2);
+
+  const bestFillCombo = fillToThresholdResult?.combos?.[0] ?? null;
 
   return (
     <main className="container nexusHome">
@@ -290,12 +294,47 @@ export default function HomePage() {
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
                     <div className="chipRow">
-                      {fillToThresholdSuggestions.map((s) => (
-                        <span key={s.id} className={`signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`}>
-                          {`${s.title} · $${s.price.toFixed(2)}`}
-                        </span>
-                      ))}
+                      {fillToThresholdSuggestions.map((s) => {
+                        const pillClass = `signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`;
+                        const text = `${s.title} · $${s.price.toFixed(2)}`;
+                        return s.url && isValidHttpUrl(s.url) ? (
+                          <a
+                            key={s.id}
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={pillClass}
+                            style={{ textDecoration: "none" }}
+                            aria-label={`${s.title} ${t("opens_in_new_tab")}`}
+                          >
+                            {text}
+                          </a>
+                        ) : (
+                          <span key={s.id} className={pillClass}>{text}</span>
+                        );
+                      })}
                     </div>
+                    {bestFillCombo && bestFillCombo.items.length >= 2 && (
+                      <p className="mutedText" style={{ marginTop: 8, marginBottom: 0 }}>
+                        {t("fill_to_50_best_combo")}{" "}
+                        {bestFillCombo.items.map((item, idx) => {
+                          const label = `${item.title}`;
+                          const suffix = idx < bestFillCombo.items.length - 1 ? " + " : "";
+                          return item.url && isValidHttpUrl(item.url) ? (
+                            <Fragment key={`${item.asin}-${idx}`}>
+                              <a href={item.url} target="_blank" rel="noopener noreferrer">{label}</a>
+                              {suffix}
+                            </Fragment>
+                          ) : (
+                            <Fragment key={`${item.asin}-${idx}`}>
+                              {label}
+                              {suffix}
+                            </Fragment>
+                          );
+                        })}
+                        {` · $${bestFillCombo.total.toFixed(2)}`}
+                      </p>
+                    )}
                   </div>
                 )}
               </>
