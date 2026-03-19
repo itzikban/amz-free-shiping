@@ -27,33 +27,38 @@ type Alternative struct {
 
 // ShippingOption represents a country where product can be shipped with free shipping
 type ShippingOption struct {
-	Country       string  `json:"country"`
-	CountryName   string  `json:"country_name"`
-	AmazonDomain  string  `json:"amazon_domain"`
-	Currency      string  `json:"currency"`
-	Price         float64 `json:"price,omitempty"`
-	FreeShipping  bool    `json:"free_shipping"`
+	Country      string  `json:"country"`
+	CountryName  string  `json:"country_name"`
+	AmazonDomain string  `json:"amazon_domain"`
+	Currency     string  `json:"currency"`
+	Price        float64 `json:"price,omitempty"`
+	FreeShipping bool    `json:"free_shipping"`
 }
 
 type Result struct {
-	URL                string         `json:"url"`
-	Country            string         `json:"country"`
-	CheckedAt          time.Time      `json:"checked_at"`
-	PriceUSD           float64        `json:"price_usd,omitempty"`
-	FreeShipping       bool           `json:"free_shipping"`
-	FreeShippingCountry bool          `json:"free_shipping_country"`
-	Signal             string         `json:"signal"`
-	Method             string         `json:"method"`
-	Title              string         `json:"title,omitempty"`
-	ImageURL           string         `json:"image_url,omitempty"`
-	Alternatives       []Alternative  `json:"alternatives,omitempty"`
-	ShippingOptions    []ShippingOption `json:"shipping_options,omitempty"` // Available countries with free shipping
+	URL                 string           `json:"url"`
+	Country             string           `json:"country"`
+	CheckedAt           time.Time        `json:"checked_at"`
+	PriceUSD            float64          `json:"price_usd,omitempty"`
+	FreeShipping        bool             `json:"free_shipping"`
+	FreeShippingCountry bool             `json:"free_shipping_country"`
+	Signal              string           `json:"signal"`
+	Method              string           `json:"method"`
+	Title               string           `json:"title,omitempty"`
+	ImageURL            string           `json:"image_url,omitempty"`
+	Alternatives        []Alternative    `json:"alternatives,omitempty"`
+	ShippingOptions     []ShippingOption `json:"shipping_options,omitempty"` // Available countries with free shipping
+}
+
+type AltCache interface {
+	Get(context.Context, string) ([]Alternative, bool)
+	Put(context.Context, string, string, []Alternative)
 }
 
 type Service struct {
 	Client      *http.Client
 	FetchMethod string // "auto" or "http"
-	AltCache    interface{} // *altcache.Cache, nil = no caching (avoids import cycle)
+	AltCache    AltCache
 }
 
 var (
@@ -89,16 +94,9 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 
 	// Check cache first (if available)
 	if s.AltCache != nil && asin != "" {
-		// Use reflection to call cache methods without importing altcache
-		cache := s.AltCache
-		// Get method: func(ctx, asin) ([]Alternative, bool)
-		if getter, ok := cache.(interface {
-			Get(context.Context, string) ([]Alternative, bool)
-		}); ok {
-			if alts, ok := getter.Get(ctx, asin); ok {
-				res.Alternatives = alts
-				return res, nil
-			}
+		if alts, ok := s.AltCache.Get(ctx, asin); ok {
+			res.Alternatives = alts
+			return res, nil
 		}
 	}
 
@@ -112,7 +110,7 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 	var err error
 
 	switch altFetchMethod {
-	case "scraper":
+	case "scraper", "":
 		log.Printf("[DEBUG] Using Amazon scraper to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
 		alts, err = s.scrapeAmazonAlternatives(ctx, res.Title)
 		if err != nil {
@@ -122,7 +120,11 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 		}
 	case "decodo":
 		log.Printf("[DEBUG] Using Decodo markdown to fetch alternatives for ASIN: %s", asin)
-		alts, err = s.decodoFetchAlternatives(ctx, asin)
+		domain := "www.amazon.com"
+		if u, parseErr := url.Parse(res.URL); parseErr == nil && u.Host != "" {
+			domain = u.Host
+		}
+		alts, err = s.decodoFetchAlternatives(ctx, asin, domain)
 		if err != nil {
 			log.Printf("[DEBUG] Decodo: fetch alternatives failed: %v", err)
 		} else {
@@ -143,7 +145,6 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 			log.Printf("[DEBUG] PA-API: found %d alternatives", len(alts))
 		}
 	default:
-		// Unknown method, try scraper as fallback
 		log.Printf("[DEBUG] Unknown ALT_FETCH_METHOD=%s, falling back to scraper", altFetchMethod)
 		alts, err = s.scrapeAmazonAlternatives(ctx, res.Title)
 		if err != nil {
@@ -155,23 +156,11 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 		res.Alternatives = alts
 		// Write to cache (if available)
 		if s.AltCache != nil && asin != "" {
-			if putter, ok := s.AltCache.(interface {
-				Put(context.Context, string, string, []Alternative)
-			}); ok {
-				putter.Put(ctx, asin, res.Title, alts)
-			}
+			s.AltCache.Put(ctx, asin, res.Title, alts)
 		}
 	}
 	// Silently ignore PA-API/scraper errors — it's a bonus feature
 	return res, nil
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // extractASINFromURL extracts ASIN from various Amazon URL formats
@@ -234,7 +223,11 @@ func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery stri
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Connection", "keep-alive")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := s.Client
+	if client == nil {
+		client = &http.Client{Timeout: 20 * time.Second}
+		s.Client = client
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
@@ -427,10 +420,10 @@ var europeanAmazonCountries = []struct {
 	domain   string
 	currency string
 }{
-	{"DE", "amazon.de", "EUR"},   // Germany - best for Israel shipping
+	{"DE", "amazon.de", "EUR"},    // Germany - best for Israel shipping
 	{"GB", "amazon.co.uk", "GBP"}, // United Kingdom - good coverage
-	{"NL", "amazon.nl", "EUR"},   // Netherlands
-	{"FR", "amazon.fr", "EUR"},   // France
+	{"NL", "amazon.nl", "EUR"},    // Netherlands
+	{"FR", "amazon.fr", "EUR"},    // France
 }
 
 // checkEuropeanAlternative checks if product has free shipping in a European country
@@ -556,7 +549,7 @@ func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, met
 }
 
 // AnalyzeHTML analyzes the provided HTML for pricing, shipping signals and basic product metadata.
-// 
+//
 // AnalyzeHTML normalizes the country (defaults to "IL"), extracts a USD price, and fills a Result
 // with URL, Country, CheckedAt, PriceUSD, FreeShipping, FreeShippingCountry, Signal, Title and ImageURL.
 // It detects CAPTCHA indicators and returns early when found, checks country-specific and general
@@ -758,7 +751,10 @@ func extractUSDPrice(html string) float64 {
 	if len(idxs) == 0 {
 		return 0
 	}
-	type cand struct{ value float64; score int }
+	type cand struct {
+		value float64
+		score int
+	}
 	cands := make([]cand, 0, len(idxs))
 	for _, m := range idxs {
 		start, end := m[0], m[1]
@@ -769,20 +765,34 @@ func extractUSDPrice(html string) float64 {
 			continue
 		}
 		left := start - 120
-		if left < 0 { left = 0 }
+		if left < 0 {
+			left = 0
+		}
 		right := end + 120
-		if right > len(lower) { right = len(lower) }
+		if right > len(lower) {
+			right = len(lower)
+		}
 		ctx := lower[left:right]
 		score := 0
-		if strings.Contains(ctx, "buy new") || strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "ourprice") || strings.Contains(ctx, "dealprice") { score += 6 }
-		if strings.Contains(ctx, "one-time purchase") { score += 3 }
-		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ounce") || strings.Contains(ctx, "shipping") || strings.Contains(ctx, "coupon") || strings.Contains(ctx, "over $") { score -= 6 }
-		cands = append(cands, cand{value:v, score:score})
+		if strings.Contains(ctx, "buy new") || strings.Contains(ctx, "price to pay") || strings.Contains(ctx, "ourprice") || strings.Contains(ctx, "dealprice") {
+			score += 6
+		}
+		if strings.Contains(ctx, "one-time purchase") {
+			score += 3
+		}
+		if strings.Contains(ctx, "/count") || strings.Contains(ctx, "per ounce") || strings.Contains(ctx, "shipping") || strings.Contains(ctx, "coupon") || strings.Contains(ctx, "over $") {
+			score -= 6
+		}
+		cands = append(cands, cand{value: v, score: score})
 	}
-	if len(cands) == 0 { return 0 }
+	if len(cands) == 0 {
+		return 0
+	}
 	best := cands[0]
 	for _, c := range cands[1:] {
-		if c.score > best.score || (c.score == best.score && c.value < best.value) { best = c }
+		if c.score > best.score || (c.score == best.score && c.value < best.value) {
+			best = c
+		}
 	}
 	return best.value
 }

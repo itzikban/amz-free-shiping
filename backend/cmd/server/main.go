@@ -87,6 +87,7 @@ func main() {
 			log.Printf("warning: Redis connection failed, altcache Redis layer disabled: %v", err)
 			rdb = nil
 		} else {
+			defer rdb.Close()
 			log.Printf("Connected to Redis at %s", redisAddr)
 		}
 	} else {

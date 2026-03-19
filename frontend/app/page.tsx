@@ -300,6 +300,7 @@ export default function HomePage() {
                   href={r.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label={`${r.title} (opens in a new tab)`}
                   className="fluid-card recCard"
                   style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
                 >

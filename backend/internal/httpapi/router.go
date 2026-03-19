@@ -18,7 +18,7 @@ import (
 // It registers endpoints for health checks, URL checking, monitoring, user panel (v1/me) and admin actions,
 // and wires the checker, monitor, userpanel, and admin services used by those routes.
 // altCache can be nil, in which case caching is disabled.
-func NewRouter(altCache interface{}) http.Handler {
+func NewRouter(altCache checker.AltCache) http.Handler {
 	mux := http.NewServeMux()
 	svc := checker.New()
 	svc.AltCache = altCache
@@ -310,7 +310,7 @@ func NewRouter(altCache interface{}) http.Handler {
 	})
 
 	// Alternative cache metrics endpoint
-	if snapper, ok := altCache.(altcache.Snapshotter); ok {
+	if snapper, ok := any(altCache).(altcache.Snapshotter); ok {
 		mux.HandleFunc("/v1/admin/altcache/metrics", func(w http.ResponseWriter, r *http.Request) {
 			if !requireAdmin(r, w) {
 				return

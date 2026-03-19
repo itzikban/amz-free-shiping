@@ -3,6 +3,7 @@ package altcache
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,13 +19,13 @@ import (
 // L2: Redis (cross-instance, 24h TTL)
 // L3: PostgreSQL (persistent, 24h TTL + future RAG)
 type Cache struct {
-	l1       sync.Map                 // key: string(asin) → *l1Entry
-	l1TTL    time.Duration            // default: 1h
-	redis    *redis.Client            // nil = skip L2
-	redisTTL time.Duration            // default: 24h
-	db       *pgxpool.Pool            // nil = skip DB write
-	dbTTL    time.Duration            // default: 24h
-	Metrics  *Metrics                 // atomic counters
+	l1       sync.Map      // key: string(asin) → *l1Entry
+	l1TTL    time.Duration // default: 1h
+	redis    *redis.Client // nil = skip L2
+	redisTTL time.Duration // default: 24h
+	db       *pgxpool.Pool // nil = skip DB write
+	dbTTL    time.Duration // default: 24h
+	Metrics  *Metrics      // atomic counters
 }
 
 // l1Entry holds a cached result with expiration time.
@@ -55,13 +56,16 @@ func (c *Cache) Get(ctx context.Context, asin string) ([]checker.Alternative, bo
 
 	// L1: Check sync.Map
 	if v, ok := c.l1.Load(asin); ok {
-		entry := v.(*l1Entry)
-		if time.Now().Before(entry.expiresAt) {
+		entry, typed := v.(*l1Entry)
+		if !typed {
+			c.l1.Delete(asin)
+		} else if time.Now().Before(entry.expiresAt) {
 			atomic.AddInt64(&c.Metrics.L1Hits, 1)
 			return entry.alts, true
+		} else {
+			// Expired, delete from L1
+			c.l1.Delete(asin)
 		}
-		// Expired, delete from L1
-		c.l1.Delete(asin)
 	}
 
 	// L2: Check Redis
@@ -109,14 +113,16 @@ func (c *Cache) Put(ctx context.Context, asin, query string, alts []checker.Alte
 		if c.redis != nil {
 			redisKey := "altcache:" + asin
 			b, _ := json.Marshal(alts)
-			c.redis.Set(bg, redisKey, string(b), c.redisTTL)
+			if err := c.redis.Set(bg, redisKey, string(b), c.redisTTL).Err(); err != nil {
+				log.Printf("[altcache] redis set failed for %s: %v", asin, err)
+			}
 		}
 
 		// DB upsert
 		if c.db != nil {
 			b, _ := json.Marshal(alts)
 			ttlSeconds := int(c.dbTTL.Seconds())
-			_, _ = c.db.Exec(bg, `
+			if _, err := c.db.Exec(bg, `
 				INSERT INTO alternative_searches
 				  (source_asin, search_query, results_json, result_count, expires_at)
 				VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 second' * $5)
@@ -124,9 +130,10 @@ func (c *Cache) Put(ctx context.Context, asin, query string, alts []checker.Alte
 				  search_query  = EXCLUDED.search_query,
 				  results_json  = EXCLUDED.results_json,
 				  result_count  = EXCLUDED.result_count,
-				  expires_at    = EXCLUDED.expires_at,
-				  created_at    = NOW()
-			`, asin, query, string(b), len(alts), ttlSeconds)
+				  expires_at    = EXCLUDED.expires_at
+			`, asin, query, string(b), len(alts), ttlSeconds); err != nil {
+				log.Printf("[altcache] db upsert failed for %s: %v", asin, err)
+			}
 		}
 	}()
 }

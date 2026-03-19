@@ -101,6 +101,7 @@ func searchAmazon(query string, maxResults int) ([]ScrapedProduct, error) {
 	}
 
 	var products []ScrapedProduct
+	seen := make(map[string]bool)
 
 	// Try multiple selectors for product containers (Amazon changes these frequently)
 	selectors := []string{
@@ -199,14 +200,20 @@ func searchAmazon(query string, maxResults int) ([]ScrapedProduct, error) {
 				}
 			}
 
-			// Only add if we have minimal data
+			// Only add if we have minimal data and not duplicate
 			if p.Title != "" && len(p.Title) > 10 {
-				products = append(products, p)
+				key := p.ASIN
+				if key == "" {
+					key = p.URL
+				}
+				if key != "" && !seen[key] {
+					seen[key] = true
+					products = append(products, p)
+				}
 			}
 		})
 
-		// If we found products, stop trying other selectors
-		if len(products) > 0 {
+		if len(products) >= maxResults {
 			break
 		}
 	}
@@ -218,94 +225,83 @@ func searchAmazon(query string, maxResults int) ([]ScrapedProduct, error) {
 	// Now fetch detail pages for shipping info
 	fmt.Printf("\n📦 Fetching shipping info for %d products...\n\n", len(products))
 	for i := range products {
-		fetchShippingInfo(&products[i])
+		if err := fetchShippingInfo(&products[i]); err != nil {
+			products[i].ShippingInfo = "shipping check failed"
+			fmt.Printf("⚠️ shipping lookup failed for %s: %v\n", products[i].ASIN, err)
+		}
 		time.Sleep(1 * time.Second) // Be nice to Amazon's servers
 	}
 
 	return products, nil
 }
 
-func fetchShippingInfo(p *ScrapedProduct) {
+func fetchShippingInfo(p *ScrapedProduct) error {
 	// Use simple product URL format
 	detailURL := fmt.Sprintf("https://www.amazon.com/dp/%s", p.ASIN)
 
 	req, err := http.NewRequest("GET", detailURL, nil)
 	if err != nil {
-		return
+		return fmt.Errorf("create detail request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Cookie", "i18n-prefs=USD; lc-main=en_US; ubid-main=130-0000000-0000000; session-id=130-0000000-0000000")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return
+		return fmt.Errorf("fetch detail page: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return
+		return fmt.Errorf("detail status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
 	if err != nil {
-		return
+		return fmt.Errorf("read detail body: %w", err)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
-		return
+		return fmt.Errorf("parse detail html: %w", err)
 	}
 
-	htmlText := string(body)
-	lowerText := strings.ToLower(htmlText)
-
-	// Check for free shipping indicators
-	freeShippingPhrases := []string{
-		"free shipping",
-		"ships free",
-		"free standard shipping",
-		"amazon prime",
-		"prime eligible",
+	shippingSelectors := []string{
+		"#delivery",
+		"#shippingMessage",
+		"#delivery-message",
+		"#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE",
+		".shipping",
 	}
 
-	// Look for free shipping in common areas
-	for _, phrase := range freeShippingPhrases {
-		if strings.Contains(lowerText, phrase) {
-			p.FreeShipUS = true
-			p.ShippingInfo = "Free shipping eligible"
-			return
-		}
-	}
-
-	// Try to find shipping info in specific elements
-	doc.Find("span, div").EachWithBreak(func(_ int, s *goquery.Selection) bool {
-		text := strings.ToLower(strings.TrimSpace(s.Text()))
-
-		// Check for free shipping
-		if strings.Contains(text, "free shipping") || strings.Contains(text, "ships free") {
-			p.FreeShipUS = true
-			p.ShippingInfo = "Free shipping"
-			return false
-		}
-
-		// Check for paid shipping
-		if strings.Contains(text, "shipping:") && strings.Contains(text, "$") {
-			parts := strings.Split(text, "shipping:")
-			if len(parts) > 1 {
-				p.ShippingInfo = strings.TrimSpace(parts[1])
+	foundSignal := false
+	for _, sel := range shippingSelectors {
+		doc.Find(sel).EachWithBreak(func(_ int, s *goquery.Selection) bool {
+			text := strings.ToLower(strings.TrimSpace(s.Text()))
+			if text == "" {
+				return true
+			}
+			if strings.Contains(text, "free shipping") || strings.Contains(text, "ships free") ||
+				(strings.Contains(text, "prime") && (strings.Contains(text, "delivery") || strings.Contains(text, "shipping"))) {
+				p.FreeShipUS = true
+				p.ShippingInfo = "Free shipping"
+				foundSignal = true
 				return false
 			}
-		}
-		return true
-	})
-
-	// If no shipping info found, check for common patterns
-	if p.ShippingInfo == "" {
-		// Look for shipping cost patterns like "$5.99 shipping"
-		if strings.Contains(lowerText, "shipping cost") || strings.Contains(lowerText, "ships to") {
-			p.ShippingInfo = "Shipping info found but not parsed"
+			if strings.Contains(text, "shipping") && strings.Contains(text, "$") {
+				p.ShippingInfo = text
+				foundSignal = true
+				return false
+			}
+			return true
+		})
+		if foundSignal {
+			return nil
 		}
 	}
+
+	return fmt.Errorf("no shipping signal found")
 }

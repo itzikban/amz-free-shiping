@@ -82,13 +82,16 @@ func (s *Service) decodoAnalyze(ctx context.Context, url, country, zip string) (
 // then parses the "Similar items that may deliver to you quickly" section.
 // This is more reliable than amazon_search because Amazon curates the similar-items
 // list itself — guaranteeing relevant, in-category results.
-func (s *Service) decodoFetchAlternatives(ctx context.Context, asin string) ([]Alternative, error) {
+func (s *Service) decodoFetchAlternatives(ctx context.Context, asin, domain string) ([]Alternative, error) {
 	token := os.Getenv("DECODO_BASIC_AUTH")
 	if token == "" {
 		return nil, fmt.Errorf("missing DECODO_BASIC_AUTH")
 	}
 	if asin == "" {
 		return nil, fmt.Errorf("no ASIN to look up alternatives for")
+	}
+	if domain == "" {
+		domain = "www.amazon.com"
 	}
 
 	payload, _ := json.Marshal(struct {
@@ -133,7 +136,7 @@ func (s *Service) decodoFetchAlternatives(ctx context.Context, asin string) ([]A
 
 	markdown := out.Results[0].Content
 	log.Printf("[DEBUG] decodoFetchAlternatives: markdown len=%d", len(markdown))
-	alts := extractAlternativesFromMarkdown(markdown)
+	alts := extractAlternativesFromMarkdown(markdown, domain)
 	log.Printf("[DEBUG] decodoFetchAlternatives: extracted %d alternatives", len(alts))
 	return alts, nil
 }
@@ -149,7 +152,7 @@ var (
 
 // extractAlternativesFromMarkdown parses the "Similar items that may deliver to you quickly"
 // numbered list from an Amazon product page returned as markdown by Decodo.
-func extractAlternativesFromMarkdown(markdown string) []Alternative {
+func extractAlternativesFromMarkdown(markdown, domain string) []Alternative {
 	// Locate the similar-items section
 	sectionStart := strings.Index(markdown, "## Similar items that may deliver to you quickly")
 	if sectionStart < 0 {
@@ -224,7 +227,7 @@ func extractAlternativesFromMarkdown(markdown string) []Alternative {
 		alts = append(alts, Alternative{
 			ASIN:         asin,
 			Title:        title,
-			URL:          fmt.Sprintf("https://www.amazon.com/dp/%s", asin),
+			URL:          fmt.Sprintf("https://%s/dp/%s", domain, asin),
 			ImageURL:     imgURL,
 			PriceUSD:     price,
 			FreeShipping: freeShip,
