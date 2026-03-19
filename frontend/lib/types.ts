@@ -19,3 +19,26 @@ export type CheckResponse = {
   image_url?: string;
   alternatives?: Alternative[];
 };
+
+export type FillSuggestion = {
+  asin: string;
+  title: string;
+  price_usd: number;
+  image_url?: string;
+  url: string;
+  free_shipping_hint: boolean;
+  score: number;
+};
+
+export type FillCombo = {
+  items: FillSuggestion[];
+  total: number;
+  score: number;
+};
+
+export type FillToThresholdResponse = {
+  current_price: number;
+  missing_amount: number;
+  suggestions: FillSuggestion[];
+  combos: FillCombo[];
+};

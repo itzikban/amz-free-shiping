@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CheckResponse } from "@/lib/types";
+import type { CheckResponse, FillToThresholdResponse } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 
 type FormState = {
@@ -26,6 +26,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
+  const [fillToThresholdResult, setFillToThresholdResult] = useState<FillToThresholdResponse | null>(null);
   const [submittedForm, setSubmittedForm] = useState<FormState | null>(null);
   const [addingWatchlist, setAddingWatchlist] = useState(false);
   const [watchlistAdded, setWatchlistAdded] = useState(false);
@@ -60,6 +61,7 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setFillToThresholdResult(null);
     setSubmittedForm(null);
     setWatchlistAdded(false);
 
@@ -71,6 +73,13 @@ export default function HomePage() {
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");
       setResult(body);
+
+      const fillRes = await fetch(`/api/fill-to-threshold?${params.toString()}&threshold=50`);
+      if (fillRes.ok) {
+        const fillBody = await fillRes.json();
+        setFillToThresholdResult(fillBody);
+      }
+
       setSubmittedForm(submitted);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -144,12 +153,25 @@ export default function HomePage() {
       }));
 
   const thresholdUsd = 50;
-  const currentPrice = result?.price_usd ?? null;
-  const missingToThreshold = currentPrice != null ? Math.max(0, thresholdUsd - currentPrice) : 0;
+  const currentPrice = fillToThresholdResult?.current_price ?? result?.price_usd ?? null;
+  const missingToThreshold = fillToThresholdResult?.missing_amount
+    ?? (currentPrice != null ? Math.max(0, thresholdUsd - currentPrice) : 0);
   const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd && result?.free_shipping_country === false;
 
   const rankedFillCandidates = useMemo(() => {
-    if (!result?.alternatives?.length || !showFillToThreshold) return [];
+    if (!showFillToThreshold) return [];
+
+    if (fillToThresholdResult?.suggestions?.length) {
+      return fillToThresholdResult.suggestions.slice(0, 2).map((s) => ({
+        id: s.asin,
+        title: s.title,
+        price: s.price_usd,
+        score: s.score,
+        freeShipping: s.free_shipping_hint,
+      }));
+    }
+
+    if (!result?.alternatives?.length) return [];
 
     return result.alternatives
       .filter((alt) => alt.price_usd != null && alt.price_usd > 0)
@@ -169,7 +191,7 @@ export default function HomePage() {
       })
       .sort((a, b) => a.score - b.score)
       .slice(0, 2);
-  }, [missingToThreshold, result?.alternatives, showFillToThreshold]);
+  }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
   const fallbackFillToThresholdSuggestions = [
     { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
