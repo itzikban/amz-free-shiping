@@ -1,0 +1,6 @@
+# linear cli
+# https://github.com/schpet/linear-cli
+
+workspace = "itzikban"
+team_id = "ITZ"
+issue_sort = "priority"

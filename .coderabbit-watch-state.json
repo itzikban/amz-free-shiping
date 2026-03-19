@@ -1,0 +1,42 @@
+{
+  "prs": {
+    "23": {
+      "last_requested_review_sha": null,
+      "last_requested_review_at": null,
+      "retrigger_count": 0,
+      "same_actionable_cycles": 0,
+      "escalated": false,
+      "pending_since": "2026-03-19T00:46:25.570766+00:00",
+      "title": "feat: ITZ-40 product check UX result card, badges, validation",
+      "url": "https://github.com/itzikban/amz-free-shiping/pull/23",
+      "last_head_sha": "b105d4aea8ef9edd69399bfe6e29b5cb4d52cda7",
+      "last_coderabbit_review_id": 3971234479,
+      "last_coderabbit_review_at": "2026-03-18T22:36:13Z",
+      "last_coderabbit_actionable": 2,
+      "last_coderabbit_comment_id": 4085991941,
+      "last_coderabbit_comment_at": "2026-03-18T22:33:27Z",
+      "last_coderabbit_confirmed_fixed": null,
+      "last_inline_fingerprint": "2:2956604183",
+      "last_inline_count": 2
+    },
+    "22": {
+      "last_requested_review_sha": null,
+      "last_requested_review_at": null,
+      "retrigger_count": 0,
+      "same_actionable_cycles": 0,
+      "escalated": false,
+      "pending_since": "2026-03-19T00:46:26.684400+00:00",
+      "title": "Fix/alternatives real products",
+      "url": "https://github.com/itzikban/amz-free-shiping/pull/22",
+      "last_head_sha": "32bd33cab137588536c2a65f33550b99fd8595ee",
+      "last_coderabbit_review_id": 3971204141,
+      "last_coderabbit_review_at": "2026-03-18T22:28:27Z",
+      "last_coderabbit_actionable": 5,
+      "last_coderabbit_comment_id": 4085940527,
+      "last_coderabbit_comment_at": "2026-03-18T22:22:34Z",
+      "last_coderabbit_confirmed_fixed": null,
+      "last_inline_fingerprint": "19:2956577762",
+      "last_inline_count": 19
+    }
+  }
+}

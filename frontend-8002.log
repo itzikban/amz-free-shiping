@@ -1,0 +1,138 @@
+
+> amz-free-shipping-frontend@0.1.0 dev
+> next dev -p 3000 -p 8002
+
+ ⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use :::8002
+    at Server.setupError: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment. 
+    at r$ (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:1667)
+    at rE (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:15:6522)
+    at no (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:19:1150)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:726
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:17831)
+    at /home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:616
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:13:16935)
+    at ni (/home/ubuntu/.openclaw/workspace/amz-free-shiping/frontend/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:20:543)

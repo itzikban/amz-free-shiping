@@ -1,0 +1,9 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:8002
+
+ ✓ Starting...
+ ✓ Ready in 1943ms
+ ○ Compiling /api/health ...
+ ✓ Compiled /api/health in 786ms (56 modules)
+ GET /api/health 200 in 971ms
+[?25h
