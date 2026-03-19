@@ -108,16 +108,19 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 
 	var alts []Alternative
 	var err error
-
-	switch altFetchMethod {
-	case "scraper", "":
-		log.Printf("[DEBUG] Using Amazon scraper to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
+	doScrape := func(prefix string) {
+		log.Printf("[DEBUG] %s Amazon scraper to fetch alternatives for: %s", prefix, res.Title[:min(50, len(res.Title))])
 		alts, err = s.scrapeAmazonAlternatives(ctx, res.Title)
 		if err != nil {
 			log.Printf("[DEBUG] Scraper: search failed: %v", err)
 		} else {
 			log.Printf("[DEBUG] Scraper: found %d alternatives", len(alts))
 		}
+	}
+
+	switch altFetchMethod {
+	case "scraper", "":
+		doScrape("Using")
 	case "decodo":
 		log.Printf("[DEBUG] Using Decodo markdown to fetch alternatives for ASIN: %s", asin)
 		domain := "www.amazon.com"
@@ -146,10 +149,7 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 		}
 	default:
 		log.Printf("[DEBUG] Unknown ALT_FETCH_METHOD=%s, falling back to scraper", altFetchMethod)
-		alts, err = s.scrapeAmazonAlternatives(ctx, res.Title)
-		if err != nil {
-			log.Printf("[DEBUG] Scraper fallback: search failed: %v", err)
-		}
+		doScrape("Falling back to")
 	}
 
 	if err == nil && len(alts) > 0 {
@@ -428,54 +428,91 @@ var europeanAmazonCountries = []struct {
 
 // checkEuropeanAlternative checks if product has free shipping in a European country
 // when it doesn't have it in Israel
-func (s *Service) checkEuropeanAlternative(ctx context.Context, url, ilZip string) (Result, error) {
-	// Try to get ASIN from URL
+func (s *Service) checkEuropeanAlternative(ctx context.Context, url, _ string) (Result, error) {
 	asin := extractASINFromURL(url)
 	if asin == "" {
 		return Result{}, fmt.Errorf("could not extract ASIN")
 	}
-
 	log.Printf("[DEBUG] Checking European alternatives for ASIN %s", asin)
 
-	// Try each European country
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	type euResult struct {
+		res  Result
+		err  error
+		code string
+	}
+	results := make(chan euResult, len(europeanAmazonCountries))
+
 	for _, country := range europeanAmazonCountries {
-		// Build Amazon Europe URL
-		euroURL := fmt.Sprintf("https://%s/dp/%s", country.domain, asin)
+		country := country
+		go func() {
+			res, err := s.checkSingleEuropeanCountry(ctx, asin, country.code, country.domain)
+			results <- euResult{res: res, err: err, code: country.code}
+		}()
+	}
 
-		// Use Decodo to check
-		if res, err := s.decodoAnalyze(ctx, euroURL, country.code, ""); err == nil && res.FreeShippingCountry {
-			log.Printf("[DEBUG] Found free shipping in %s", country.code)
-			res.Signal = fmt.Sprintf("eu_alternative|%s_free_shipping", country.code)
-			return res, nil
-		}
-
-		// Fall back to HTTP
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, euroURL, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
-
-		resp, err := s.Client.Do(req)
-		if err != nil {
-			continue
-		}
-
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
-		resp.Body.Close()
-		if readErr != nil {
-			continue
-		}
-		res := AnalyzeHTML(euroURL, country.code, string(body))
-
-		if res.FreeShippingCountry {
-			log.Printf("[DEBUG] Found free shipping in %s via HTTP", country.code)
-			res.Signal = fmt.Sprintf("eu_alternative|%s_free_shipping", country.code)
-			return res, nil
+	var lastErr error
+	for i := 0; i < len(europeanAmazonCountries); i++ {
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return Result{}, lastErr
+			}
+			return Result{}, ctx.Err()
+		case out := <-results:
+			if out.err != nil {
+				lastErr = out.err
+				continue
+			}
+			if out.res.FreeShippingCountry {
+				cancel()
+				log.Printf("[DEBUG] Found free shipping in %s", out.code)
+				out.res.Signal = fmt.Sprintf("eu_alternative|%s_free_shipping", out.code)
+				return out.res, nil
+			}
 		}
 	}
 
+	if lastErr != nil {
+		return Result{}, fmt.Errorf("no EU countries with free shipping found: %w", lastErr)
+	}
 	return Result{}, fmt.Errorf("no EU countries with free shipping found")
+}
+
+func (s *Service) checkSingleEuropeanCountry(ctx context.Context, asin, countryCode, domain string) (Result, error) {
+	euroURL := fmt.Sprintf("https://%s/dp/%s", domain, asin)
+	if res, err := s.decodoAnalyze(ctx, euroURL, countryCode, ""); err == nil && res.FreeShippingCountry {
+		return res, nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, euroURL, nil)
+	if err != nil {
+		return Result{}, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+
+	client := s.Client
+	if client == nil {
+		client = &http.Client{Timeout: 20 * time.Second}
+		s.Client = client
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Result{}, err
+	}
+	defer resp.Body.Close()
+
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
+	if readErr != nil {
+		return Result{}, readErr
+	}
+	res := AnalyzeHTML(euroURL, countryCode, string(body))
+	if res.FreeShippingCountry {
+		return res, nil
+	}
+	return Result{}, fmt.Errorf("no free shipping in %s", countryCode)
 }
 
 func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Result, error) {

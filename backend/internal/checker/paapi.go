@@ -3,9 +3,6 @@ package checker
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,15 +11,17 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"free-ship-checker-go/internal/sigv4"
 )
 
 // PAAClient holds PA-API v5 credentials and client
 type PAAClient struct {
-	AccessKeyID string
-	SecretKey   string
+	AccessKeyID  string
+	SecretKey    string
 	AssociateTag string
-	Region      string
-	HTTPClient  *http.Client
+	Region       string
+	HTTPClient   *http.Client
 }
 
 // NewPAAClient creates a PA-API client from environment variables
@@ -44,7 +43,7 @@ type SearchItemsResponse struct {
 	} `json:"Errors"`
 	SearchResult struct {
 		Items []struct {
-			ASIN string `json:"ASIN"`
+			ASIN     string `json:"ASIN"`
 			ItemInfo struct {
 				Title struct {
 					DisplayValue string `json:"DisplayValue"`
@@ -185,7 +184,7 @@ func (c *PAAClient) signRequest(req *http.Request, bodyBytes []byte, host, servi
 	amzDate := now.Format("20060102T150405Z")
 	datestamp := now.Format("20060102")
 
-	payloadHash := sha256Hash(bodyBytes)
+	payloadHash := sigv4.SHA256Hash(bodyBytes)
 
 	// Canonical request
 	signedHeaders := []string{"content-encoding", "content-type", "host", "x-amz-date", "x-amz-target"}
@@ -213,12 +212,12 @@ func (c *PAAClient) signRequest(req *http.Request, bodyBytes []byte, host, servi
 
 	// String to sign
 	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", datestamp, c.Region, service)
-	canonicalHash := sha256Hash([]byte(canonicalRequest))
+	canonicalHash := sigv4.SHA256Hash([]byte(canonicalRequest))
 	stringToSign := fmt.Sprintf("AWS4-HMAC-SHA256\n%s\n%s\n%s", amzDate, credentialScope, canonicalHash)
 
 	// Derive signing key
-	signingKey := deriveSigningKey(c.SecretKey, datestamp, c.Region, service)
-	signature := hmacSha256(signingKey, stringToSign)
+	signingKey := sigv4.DeriveSigningKey(c.SecretKey, datestamp, c.Region, service)
+	signature := sigv4.HMACSHA256(signingKey, stringToSign)
 
 	// Build Authorization header
 	authHeader := fmt.Sprintf(
@@ -228,34 +227,4 @@ func (c *PAAClient) signRequest(req *http.Request, bodyBytes []byte, host, servi
 
 	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("X-Amz-Date", amzDate)
-}
-
-// Helper functions for AWS Signature v4
-
-func sha256Hash(data []byte) string {
-	h := sha256.New()
-	h.Write(data)
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func hmacSha256(key []byte, data string) string {
-	h := hmac.New(sha256.New, key)
-	h.Write([]byte(data))
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func deriveSigningKey(secretKey, dateStamp, region, service string) []byte {
-	kDate := hmac.New(sha256.New, []byte("AWS4"+secretKey))
-	kDate.Write([]byte(dateStamp))
-
-	kRegion := hmac.New(sha256.New, kDate.Sum(nil))
-	kRegion.Write([]byte(region))
-
-	kService := hmac.New(sha256.New, kRegion.Sum(nil))
-	kService.Write([]byte(service))
-
-	kSigning := hmac.New(sha256.New, kService.Sum(nil))
-	kSigning.Write([]byte("aws4_request"))
-
-	return kSigning.Sum(nil)
 }
