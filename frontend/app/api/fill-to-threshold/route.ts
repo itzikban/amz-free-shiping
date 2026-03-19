@@ -22,8 +22,20 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(backendUrl, { method: "GET", cache: "no-store" });
-    const body = await res.json();
-    return NextResponse.json(body, { status: res.status });
+    const raw = await res.text();
+
+    try {
+      const body = JSON.parse(raw);
+      return NextResponse.json(body, { status: res.status });
+    } catch {
+      return NextResponse.json(
+        {
+          error: "backend_invalid_response",
+          detail: raw.slice(0, 300),
+        },
+        { status: 502 }
+      );
+    }
   } catch (err) {
     return NextResponse.json(
       { error: "backend_unreachable", detail: err instanceof Error ? err.message : "unknown" },
