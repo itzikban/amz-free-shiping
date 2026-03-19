@@ -147,11 +147,39 @@ export default function HomePage() {
   const currentPrice = result?.price_usd ?? null;
   const missingToThreshold = currentPrice != null ? Math.max(0, thresholdUsd - currentPrice) : 0;
   const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd && result?.free_shipping_country === false;
-  const fillToThresholdSuggestions = [
+
+  const rankedFillCandidates = useMemo(() => {
+    if (!result?.alternatives?.length || !showFillToThreshold) return [];
+
+    return result.alternatives
+      .filter((alt) => alt.price_usd != null && alt.price_usd > 0)
+      .map((alt) => {
+        const price = alt.price_usd as number;
+        const overspend = Math.max(0, price - missingToThreshold);
+        const gap = Math.abs(price - missingToThreshold);
+        const shippingBonus = alt.free_shipping ? -2 : 0;
+        const score = gap + overspend * 2 + shippingBonus;
+        return {
+          id: alt.asin,
+          title: alt.title,
+          price,
+          score,
+          freeShipping: alt.free_shipping,
+        };
+      })
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 2);
+  }, [missingToThreshold, result?.alternatives, showFillToThreshold]);
+
+  const fallbackFillToThresholdSuggestions = [
     { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
     { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99 },
     { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99 },
   ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
+
+  const fillToThresholdSuggestions = rankedFillCandidates.length > 0
+    ? rankedFillCandidates
+    : fallbackFillToThresholdSuggestions.slice(0, 2);
 
   return (
     <main className="container nexusHome">
@@ -240,8 +268,10 @@ export default function HomePage() {
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
                     <div className="chipRow">
-                      {fillToThresholdSuggestions.slice(0, 2).map((s) => (
-                        <span key={s.id} className="signalPill neutral">{`${s.title} · $${s.price.toFixed(2)}`}</span>
+                      {fillToThresholdSuggestions.map((s) => (
+                        <span key={s.id} className={`signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`}>
+                          {`${s.title} · $${s.price.toFixed(2)}`}
+                        </span>
                       ))}
                     </div>
                   </div>
