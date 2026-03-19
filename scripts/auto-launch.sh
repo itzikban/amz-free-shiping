@@ -29,7 +29,7 @@ FRONTEND_INSTALL_CMD="npm install"
 BACKEND_BUILD_CMD=""
 
 # Git pull branch behavior
-GIT_PULL_CMD="git pull"
+GIT_PULL_CMD="git pull 2>/dev/null || true"
 
 # Logs and pid files
 RUN_DIR="$ROOT_DIR/.run"

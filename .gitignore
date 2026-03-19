@@ -6,4 +6,5 @@ frontend/.env
 .run/
 .logs/
 .agent/
+.previews/
 Focus.md
