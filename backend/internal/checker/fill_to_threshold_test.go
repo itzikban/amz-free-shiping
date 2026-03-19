@@ -35,3 +35,26 @@ func TestBuildFillToThreshold_ExcludesSinglesAboveThreshold(t *testing.T) {
 		t.Fatalf("expected remaining suggestion A2, got %s", resp.Suggestions[0].ASIN)
 	}
 }
+
+func TestBuildFillToThreshold_CombosIncludeSingleItemBundles(t *testing.T) {
+	alts := []Alternative{
+		{ASIN: "A1", Title: "A1", PriceUSD: 10.00, URL: "https://amazon.com/dp/A1", FreeShipping: false},
+		{ASIN: "A2", Title: "A2", PriceUSD: 9.50, URL: "https://amazon.com/dp/A2", FreeShipping: true},
+	}
+
+	resp := BuildFillToThreshold(40.0, 50.0, alts)
+	if len(resp.Combos) == 0 {
+		t.Fatalf("expected combos, got none")
+	}
+
+	foundSingle := false
+	for _, combo := range resp.Combos {
+		if len(combo.Items) == 1 {
+			foundSingle = true
+			break
+		}
+	}
+	if !foundSingle {
+		t.Fatalf("expected at least one single-item combo in response")
+	}
+}

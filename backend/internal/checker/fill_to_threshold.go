@@ -83,6 +83,9 @@ func buildCombos(suggestions []FillSuggestion, missing float64) []FillCombo {
 	}
 
 	for i := 0; i < maxN; i++ {
+		// Include 1-item combos so the API can return combo bundles of size 1..3.
+		combos = append(combos, scoreCombo([]FillSuggestion{suggestions[i]}, missing))
+
 		for j := i + 1; j < maxN; j++ {
 			items := []FillSuggestion{suggestions[i], suggestions[j]}
 			combos = append(combos, scoreCombo(items, missing))
