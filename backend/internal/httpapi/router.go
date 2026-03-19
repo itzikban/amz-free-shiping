@@ -79,13 +79,12 @@ func NewRouter(altCache checker.AltCache) http.Handler {
 			threshold = v
 		}
 
-		res, err := svc.CheckURLWithMethod(r.Context(), url, country, zip, r.URL.Query().Get("method"))
+		payload, err := svc.BuildFillToThresholdForURL(r.Context(), url, country, zip, threshold, r.URL.Query().Get("method"))
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 			return
 		}
 
-		payload := checker.BuildFillToThreshold(res.PriceUSD, threshold, res.Alternatives)
 		writeJSON(w, http.StatusOK, payload)
 	})
 

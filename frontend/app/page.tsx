@@ -197,24 +197,9 @@ export default function HomePage() {
       .slice(0, 2);
   }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
-  const fallbackFillToThresholdSuggestions = [
-    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined, imageUrl: undefined },
-    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined, imageUrl: undefined },
-    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined, imageUrl: undefined },
-  ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
-
   const fillToThresholdSuggestions = rankedFillCandidates.length > 0
     ? rankedFillCandidates
-    : fallbackFillToThresholdSuggestions.slice(0, 2).map((fallback, idx) => {
-        const alt = result?.alternatives?.[idx];
-        if (!alt) return fallback;
-        return {
-          ...fallback,
-          imageUrl: alt.image_url || fallback.imageUrl,
-          url: alt.url || fallback.url,
-          freeShipping: alt.free_shipping,
-        };
-      });
+    : [];
 
   const bestFillCombo = fillToThresholdResult?.combos?.[0] ?? null;
 
@@ -304,45 +289,49 @@ export default function HomePage() {
                       <span className="signalPill ok">{`${t("fill_to_50_missing_prefix")} $${missingToThreshold.toFixed(2)}`}</span>
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
-                    <div className="recommendGrid" style={{ marginTop: 8 }}>
-                      {fillToThresholdSuggestions.map((s) => {
-                        const canOpen = !!(s.url && isValidHttpUrl(s.url));
-                        const title = `${s.title} · $${s.price.toFixed(2)}`;
-                        const card = (
-                          <>
-                            {s.imageUrl ? (
-                              <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} />
-                            ) : (
-                              <div className="recImage img-placeholder-2" />
-                            )}
-                            <h4>{s.title}</h4>
-                            <div className="recMeta">
-                              <strong>{`$${s.price.toFixed(2)}`}</strong>
-                              <div className="chipRow">
-                                {("freeShipping" in s && s.freeShipping) && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>}
-                                <span className="signalPill neutral">{t("opens_in_new_tab")}</span>
+                    {fillToThresholdSuggestions.length > 0 ? (
+                      <div className="recommendGrid" style={{ marginTop: 8 }}>
+                        {fillToThresholdSuggestions.map((s) => {
+                          const canOpen = !!(s.url && isValidHttpUrl(s.url));
+                          const title = `${s.title} · $${s.price.toFixed(2)}`;
+                          const card = (
+                            <>
+                              {s.imageUrl ? (
+                                <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} />
+                              ) : (
+                                <div className="recImage img-placeholder-2" />
+                              )}
+                              <h4>{s.title}</h4>
+                              <div className="recMeta">
+                                <strong>{`$${s.price.toFixed(2)}`}</strong>
+                                <div className="chipRow">
+                                  {("freeShipping" in s && s.freeShipping) && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>}
+                                  {canOpen && <span className="signalPill neutral">{t("opens_in_new_tab")}</span>}
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        );
+                            </>
+                          );
 
-                        return canOpen ? (
-                          <a
-                            key={s.id}
-                            href={s.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="fluid-card recCard"
-                            style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
-                            aria-label={`${title} ${t("opens_in_new_tab")}`}
-                          >
-                            {card}
-                          </a>
-                        ) : (
-                          <article key={s.id} className="fluid-card recCard">{card}</article>
-                        );
-                      })}
-                    </div>
+                          return canOpen ? (
+                            <a
+                              key={s.id}
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="fluid-card recCard"
+                              style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                              aria-label={`${title} ${t("opens_in_new_tab")}`}
+                            >
+                              {card}
+                            </a>
+                          ) : (
+                            <article key={s.id} className="fluid-card recCard">{card}</article>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mutedText" style={{ marginTop: 8 }}>{t("fill_to_50_no_realtime_suggestions")}</p>
+                    )}
                     {bestFillCombo && bestFillCombo.items.length >= 2 && (
                       <p className="mutedText" style={{ marginTop: 8, marginBottom: 0 }}>
                         {t("fill_to_50_best_combo")}{" "}
