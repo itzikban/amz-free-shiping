@@ -165,6 +165,7 @@ export default function HomePage() {
           price,
           score,
           freeShipping: alt.free_shipping,
+          url: alt.url,
         };
       })
       .sort((a, b) => a.score - b.score)
@@ -268,11 +269,34 @@ export default function HomePage() {
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
                     <div className="chipRow">
-                      {fillToThresholdSuggestions.map((s) => (
-                        <span key={s.id} className={`signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`}>
-                          {`${s.title} · $${s.price.toFixed(2)}`}
-                        </span>
-                      ))}
+                      {fillToThresholdSuggestions.map((s) => {
+                        const className = `signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`;
+                        const label = `${s.title} · $${s.price.toFixed(2)}`;
+                        const candidateUrl = "url" in s && typeof s.url === "string" ? s.url : null;
+                        const isLink = candidateUrl !== null && isValidHttpUrl(candidateUrl);
+
+                        if (isLink && candidateUrl) {
+                          return (
+                            <a
+                              key={s.id}
+                              href={candidateUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`${s.title} ${t("opens_in_new_tab")}`}
+                              className={className}
+                              style={{ textDecoration: "none" }}
+                            >
+                              {label}
+                            </a>
+                          );
+                        }
+
+                        return (
+                          <span key={s.id} className={className}>
+                            {label}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
