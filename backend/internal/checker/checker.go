@@ -520,13 +520,17 @@ func (s *Service) CheckURL(ctx context.Context, url, country, zip string) (Resul
 }
 
 func (s *Service) CheckURLWithMethod(ctx context.Context, url, country, zip, method string) (Result, error) {
-	// 1. Try Decodo API first (preferred method) — trust its result when it succeeds
+	// 1. Try Decodo API first (preferred method) — trust its result when it succeeds.
 	if method != "http" {
 		if dres, derr := s.decodoAnalyze(ctx, url, country, zip); derr == nil {
+			// For most countries, prefer Decodo result directly to avoid noisy HTTP captcha false-positives.
+			if strings.ToUpper(country) != "IL" {
+				return s.enrichWithAlternatives(ctx, dres)
+			}
 			if dres.FreeShippingCountry {
 				return s.enrichWithAlternatives(ctx, dres)
 			}
-			// Decodo succeeded but not free for destination; continue to fallback checks (HTTP/browser/EU).
+			// IL-specific path: continue fallback checks for EU alternatives when Decodo is not free-shipping.
 		}
 		// Decodo failed (API error, no auth, etc.) — fall through to HTTP/browser
 	}

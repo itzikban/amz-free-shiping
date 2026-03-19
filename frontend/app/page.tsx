@@ -149,7 +149,21 @@ export default function HomePage() {
   const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd && result?.free_shipping_country === false;
 
   const rankedFillCandidates = useMemo(() => {
-    if (!result?.alternatives?.length || !showFillToThreshold) return [];
+    if (!showFillToThreshold) return [];
+
+    if (fillToThresholdResult?.suggestions?.length) {
+      return fillToThresholdResult.suggestions.slice(0, 2).map((s) => ({
+        id: s.asin,
+        title: s.title,
+        price: s.price_usd,
+        score: s.score,
+        freeShipping: s.free_shipping_hint,
+        url: s.url,
+        imageUrl: s.image_url,
+      }));
+    }
+
+    if (!result?.alternatives?.length) return [];
 
     return result.alternatives
       .filter((alt) => alt.price_usd != null && alt.price_usd > 0)
@@ -166,16 +180,17 @@ export default function HomePage() {
           score,
           freeShipping: alt.free_shipping,
           url: alt.url,
+          imageUrl: alt.image_url,
         };
       })
       .sort((a, b) => a.score - b.score)
       .slice(0, 2);
-  }, [missingToThreshold, result?.alternatives, showFillToThreshold]);
+  }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
   const fallbackFillToThresholdSuggestions = [
-    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
-    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99 },
-    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99 },
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined, imageUrl: undefined },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined, imageUrl: undefined },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined, imageUrl: undefined },
   ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
 
   const fillToThresholdSuggestions = rankedFillCandidates.length > 0
@@ -268,33 +283,42 @@ export default function HomePage() {
                       <span className="signalPill ok">{`${t("fill_to_50_missing_prefix")} $${missingToThreshold.toFixed(2)}`}</span>
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
-                    <div className="chipRow">
+                    <div className="recommendGrid" style={{ marginTop: 8 }}>
                       {fillToThresholdSuggestions.map((s) => {
-                        const className = `signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`;
-                        const label = `${s.title} · $${s.price.toFixed(2)}`;
-                        const candidateUrl = "url" in s && typeof s.url === "string" ? s.url : null;
-                        const isLink = candidateUrl !== null && isValidHttpUrl(candidateUrl);
+                        const canOpen = !!(s.url && isValidHttpUrl(s.url));
+                        const title = `${s.title} · $${s.price.toFixed(2)}`;
+                        const card = (
+                          <>
+                            {s.imageUrl ? (
+                              <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} />
+                            ) : (
+                              <div className="recImage img-placeholder-2" />
+                            )}
+                            <h4>{s.title}</h4>
+                            <div className="recMeta">
+                              <strong>{`$${s.price.toFixed(2)}`}</strong>
+                              <div className="chipRow">
+                                {("freeShipping" in s && s.freeShipping) && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>}
+                                {canOpen && <span className="signalPill neutral">{t("opens_in_new_tab")}</span>}
+                              </div>
+                            </div>
+                          </>
+                        );
 
-                        if (isLink && candidateUrl) {
-                          return (
-                            <a
-                              key={s.id}
-                              href={candidateUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`${s.title} ${t("opens_in_new_tab")}`}
-                              className={className}
-                              style={{ textDecoration: "none" }}
-                            >
-                              {label}
-                            </a>
-                          );
-                        }
-
-                        return (
-                          <span key={s.id} className={className}>
-                            {label}
-                          </span>
+                        return canOpen ? (
+                          <a
+                            key={s.id}
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="fluid-card recCard"
+                            style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                            aria-label={`${title} ${t("opens_in_new_tab")}`}
+                          >
+                            {card}
+                          </a>
+                        ) : (
+                          <article key={s.id} className="fluid-card recCard">{card}</article>
                         );
                       })}
                     </div>
