@@ -169,6 +169,7 @@ export default function HomePage() {
         score: s.score,
         freeShipping: s.free_shipping_hint,
         url: s.url,
+        imageUrl: s.image_url,
       }));
     }
 
@@ -189,6 +190,7 @@ export default function HomePage() {
           score,
           freeShipping: alt.free_shipping,
           url: alt.url,
+          imageUrl: alt.image_url,
         };
       })
       .sort((a, b) => a.score - b.score)
@@ -196,9 +198,9 @@ export default function HomePage() {
   }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
   const fallbackFillToThresholdSuggestions = [
-    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined },
-    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined },
-    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined },
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined, imageUrl: undefined },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined, imageUrl: undefined },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined, imageUrl: undefined },
   ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
 
   const fillToThresholdSuggestions = rankedFillCandidates.length > 0
@@ -293,24 +295,42 @@ export default function HomePage() {
                       <span className="signalPill ok">{`${t("fill_to_50_missing_prefix")} $${missingToThreshold.toFixed(2)}`}</span>
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
-                    <div className="chipRow">
+                    <div className="recommendGrid" style={{ marginTop: 8 }}>
                       {fillToThresholdSuggestions.map((s) => {
-                        const pillClass = `signalPill ${"freeShipping" in s && s.freeShipping ? "ok" : "neutral"}`;
-                        const text = `${s.title} · $${s.price.toFixed(2)}`;
-                        return s.url && isValidHttpUrl(s.url) ? (
+                        const canOpen = !!(s.url && isValidHttpUrl(s.url));
+                        const title = `${s.title} · $${s.price.toFixed(2)}`;
+                        const card = (
+                          <>
+                            {s.imageUrl ? (
+                              <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} />
+                            ) : (
+                              <div className="recImage img-placeholder-2" />
+                            )}
+                            <h4>{s.title}</h4>
+                            <div className="recMeta">
+                              <strong>{`$${s.price.toFixed(2)}`}</strong>
+                              <div className="chipRow">
+                                {("freeShipping" in s && s.freeShipping) && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>}
+                                <span className="signalPill neutral">{t("opens_in_new_tab")}</span>
+                              </div>
+                            </div>
+                          </>
+                        );
+
+                        return canOpen ? (
                           <a
                             key={s.id}
                             href={s.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={pillClass}
-                            style={{ textDecoration: "none" }}
-                            aria-label={`${s.title} ${t("opens_in_new_tab")}`}
+                            className="fluid-card recCard"
+                            style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                            aria-label={`${title} ${t("opens_in_new_tab")}`}
                           >
-                            {text}
+                            {card}
                           </a>
                         ) : (
-                          <span key={s.id} className={pillClass}>{text}</span>
+                          <article key={s.id} className="fluid-card recCard">{card}</article>
                         );
                       })}
                     </div>
