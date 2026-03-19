@@ -129,7 +129,7 @@ export default function HomePage() {
         id: i + 1,
         type: "real" as const,
         title: alt.title,
-        price: alt.price_usd ? `$${alt.price_usd.toFixed(2)}` : "N/A",
+        price: alt.price_usd != null ? `$${alt.price_usd.toFixed(2)}` : "N/A",
         imageUrl: alt.image_url,
         url: alt.url,
         freeShipping: alt.free_shipping,
@@ -146,7 +146,7 @@ export default function HomePage() {
   const thresholdUsd = 50;
   const currentPrice = result?.price_usd ?? null;
   const missingToThreshold = currentPrice != null ? Math.max(0, thresholdUsd - currentPrice) : 0;
-  const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd;
+  const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd && result?.free_shipping_country === false;
   const fillToThresholdSuggestions = [
     { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
     { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99 },
@@ -300,7 +300,7 @@ export default function HomePage() {
                   href={r.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`${r.title} (opens in a new tab)`}
+                  aria-label={`${r.title} ${t("opens_in_new_tab")}`}
                   className="fluid-card recCard"
                   style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
                 >

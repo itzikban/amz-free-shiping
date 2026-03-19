@@ -2,6 +2,7 @@ package altcache
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"sync"
@@ -47,7 +48,7 @@ func New(rdb *redis.Client, db *pgxpool.Pool) *Cache {
 	}
 }
 
-// Get looks up alternatives by ASIN across all layers: L1 → L2 → miss.
+// Get looks up alternatives by ASIN across all layers: L1 → L2 → L3 → miss.
 // Returns (alternatives, found bool). Never errors; degrades gracefully if layers unavailable.
 func (c *Cache) Get(ctx context.Context, asin string) ([]checker.Alternative, bool) {
 	if c == nil || asin == "" {
@@ -87,6 +88,30 @@ func (c *Cache) Get(ctx context.Context, asin string) ([]checker.Alternative, bo
 		// redis.Nil is a miss, other errors are silent
 	}
 
+	// L3: Check PostgreSQL
+	if c.db != nil {
+		var raw string
+		err := c.db.QueryRow(ctx, `
+			SELECT results_json
+			FROM alternative_searches
+			WHERE source_asin = $1
+			  AND expires_at > NOW()
+		`, asin).Scan(&raw)
+		if err == nil {
+			var alts []checker.Alternative
+			if uerr := json.Unmarshal([]byte(raw), &alts); uerr == nil {
+				c.l1.Store(asin, &l1Entry{
+					alts:      alts,
+					expiresAt: time.Now().Add(c.l1TTL),
+				})
+				atomic.AddInt64(&c.Metrics.L3Hits, 1)
+				return alts, true
+			}
+		} else if err != sql.ErrNoRows {
+			log.Printf("[altcache] db read failed for %s: %v", asin, err)
+		}
+	}
+
 	// Miss
 	atomic.AddInt64(&c.Metrics.Misses, 1)
 	return nil, false
@@ -94,8 +119,11 @@ func (c *Cache) Get(ctx context.Context, asin string) ([]checker.Alternative, bo
 
 // Put stores alternatives in all cache layers (L1 synchronously, L2+L3 async).
 func (c *Cache) Put(ctx context.Context, asin, query string, alts []checker.Alternative) {
-	if c == nil || asin == "" || len(alts) == 0 {
+	if c == nil || asin == "" {
 		return
+	}
+	if alts == nil {
+		alts = []checker.Alternative{}
 	}
 
 	// L1: synchronous
@@ -107,7 +135,8 @@ func (c *Cache) Put(ctx context.Context, asin, query string, alts []checker.Alte
 
 	// L2 + L3: fire and forget (use detached context)
 	go func() {
-		bg := context.Background()
+		bg, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
 
 		// Redis SET
 		if c.redis != nil {

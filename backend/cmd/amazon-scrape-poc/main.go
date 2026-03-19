@@ -236,6 +236,10 @@ func searchAmazon(query string, maxResults int) ([]ScrapedProduct, error) {
 }
 
 func fetchShippingInfo(p *ScrapedProduct) error {
+	if strings.TrimSpace(p.ASIN) == "" {
+		return fmt.Errorf("missing ASIN for product")
+	}
+
 	// Use simple product URL format
 	detailURL := fmt.Sprintf("https://www.amazon.com/dp/%s", p.ASIN)
 
