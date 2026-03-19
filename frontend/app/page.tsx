@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 
 type FormState = {
   url: string;
-  country: "US" | "IL";
+  country: "US" | "IL" | "NL";
   zip: string;
 };
 
@@ -22,7 +22,7 @@ const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
  */
 export default function HomePage() {
   const { t } = useI18n();
-  const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "IL", zip: "10013" });
+  const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "IL", zip: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResponse | null>(null);
@@ -33,9 +33,19 @@ export default function HomePage() {
 
   const canSubmit = useMemo(() => {
     if (!form.url.startsWith("http")) return false;
+    // Only US requires ZIP code
     if (form.country === "US" && !form.zip.trim()) return false;
     return true;
   }, [form]);
+
+  const isValidHttpUrl = (value: string): boolean => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,11 +107,51 @@ export default function HomePage() {
     }
   }
 
-  const recommendations = [
+  const mockRecommendations = [
     { id: 1, titleKey: "rec_title_1", price: "$345", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-1" },
     { id: 2, titleKey: "rec_title_2", price: "$348", tagKey: "rec_tag_best_match", cls: "img-placeholder-2" },
     { id: 3, titleKey: "rec_title_3", price: "$429", tagKey: "rec_tag_free_shipping", cls: "img-placeholder-3" },
   ] as const;
+
+  type MockRecommendation = (typeof mockRecommendations)[number];
+
+  type RecommendationCard = {
+    id: number;
+    type: "mock" | "real";
+    price: string;
+  } & (
+    | { type: "mock"; titleKey: MockRecommendation["titleKey"]; tagKey: MockRecommendation["tagKey"]; cls: string }
+    | { type: "real"; title: string; imageUrl?: string; url?: string; freeShipping: boolean }
+  );
+
+  const recommendations: RecommendationCard[] = result?.alternatives && result.alternatives.length > 0
+    ? result.alternatives.map((alt, i) => ({
+        id: i + 1,
+        type: "real" as const,
+        title: alt.title,
+        price: alt.price_usd ? `$${alt.price_usd.toFixed(2)}` : "N/A",
+        imageUrl: alt.image_url,
+        url: alt.url,
+        freeShipping: alt.free_shipping,
+      }))
+    : mockRecommendations.map((r) => ({
+        id: r.id,
+        type: "mock" as const,
+        titleKey: r.titleKey,
+        tagKey: r.tagKey,
+        price: r.price,
+        cls: r.cls,
+      }));
+
+  const thresholdUsd = 50;
+  const currentPrice = result?.price_usd ?? null;
+  const missingToThreshold = currentPrice != null ? Math.max(0, thresholdUsd - currentPrice) : 0;
+  const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd;
+  const fillToThresholdSuggestions = [
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99 },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99 },
+  ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
 
   return (
     <main className="container nexusHome">
@@ -129,10 +179,11 @@ export default function HomePage() {
               id="destination-country"
               className="clean-input"
               value={form.country}
-              onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" }))}
+              onChange={(e) => setForm((x) => ({ ...x, country: e.target.value as "US" | "IL" | "NL" }))}
             >
               <option value="IL">{t("home_country_il")}</option>
               <option value="US">{t("home_country_us")}</option>
+              <option value="NL">{t("home_country_nl")}</option>
             </select>
           </div>
 
@@ -180,6 +231,21 @@ export default function HomePage() {
                   <span className="signalPill neutral">{result.country}</span>
                   <span className="signalPill neutral" title={result.signal}>{result.signal.length > 30 ? result.signal.slice(0, 30) + "…" : result.signal}</span>
                 </div>
+
+                {showFillToThreshold && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="chipRow" style={{ marginBottom: 8 }}>
+                      <span className="signalPill neutral">{t("fill_to_50_badge")}</span>
+                      <span className="signalPill ok">{`${t("fill_to_50_missing_prefix")} $${missingToThreshold.toFixed(2)}`}</span>
+                    </div>
+                    <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
+                    <div className="chipRow">
+                      {fillToThresholdSuggestions.slice(0, 2).map((s) => (
+                        <span key={s.id} className="signalPill neutral">{`${s.title} · $${s.price.toFixed(2)}`}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {result && submittedForm && (
@@ -194,26 +260,57 @@ export default function HomePage() {
         </section>
       )}
 
-      {loading && (
+      {(loading || (result && !result.free_shipping_country)) && (
         <>
           <section className="flowHint animate-flow-3">
             <span>{t("home_flow_hint")}</span>
           </section>
 
           <section className="recommendGrid animate-flow-3">
-            {recommendations.map((r) => (
-              <article key={r.id} className="fluid-card recCard">
-                <div className={`recImage ${r.cls}`} />
-                <h4>{t(r.titleKey)}</h4>
-                <div className="recMeta">
-                  <strong>{r.price}</strong>
-                  <div className="chipRow">
-                    <span className="signalPill neutral">{t("home_demo_label")}</span>
-                    <span className={`signalPill ${r.tagKey === "rec_tag_best_match" ? "neutral" : "ok"}`}>{t(r.tagKey)}</span>
+            {recommendations.map((r) => {
+              const content = (
+                <>
+                  {r.type === "mock" ? (
+                    <div className={`recImage ${r.cls}`} />
+                  ) : (
+                    r.imageUrl ? (
+                      <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} />
+                    ) : (
+                      <div className="recImage img-placeholder-1" />
+                    )
+                  )}
+                  <h4>{r.type === "mock" ? t(r.titleKey) : r.title}</h4>
+                  <div className="recMeta">
+                    <strong>{r.price}</strong>
+                    <div className="chipRow">
+                      {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
+                      {r.type === "mock" ? (
+                        <span className="signalPill ok">{t(r.tagKey)}</span>
+                      ) : (
+                        r.freeShipping && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </>
+              );
+
+              return r.type === "real" && r.url && isValidHttpUrl(r.url) ? (
+                <a
+                  key={r.id}
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="fluid-card recCard"
+                  style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                >
+                  {content}
+                </a>
+              ) : (
+                <article key={r.id} className="fluid-card recCard">
+                  {content}
+                </article>
+              );
+            })}
           </section>
         </>
       )}
