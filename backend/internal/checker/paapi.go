@@ -158,6 +158,9 @@ func (c *PAAClient) SearchItems(ctx context.Context, keywords string, itemCount 
 			continue
 		}
 		listing := item.Offers.Listings[selectedIdx]
+		if listing.Price.Currency != "" && listing.Price.Currency != "USD" {
+			continue
+		}
 
 		alt := Alternative{
 			ASIN:         item.ASIN,
