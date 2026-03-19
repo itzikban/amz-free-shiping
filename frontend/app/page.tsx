@@ -143,6 +143,16 @@ export default function HomePage() {
         cls: r.cls,
       }));
 
+  const thresholdUsd = 50;
+  const currentPrice = result?.price_usd ?? null;
+  const missingToThreshold = currentPrice != null ? Math.max(0, thresholdUsd - currentPrice) : 0;
+  const showFillToThreshold = currentPrice != null && currentPrice < thresholdUsd;
+  const fillToThresholdSuggestions = [
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99 },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99 },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99 },
+  ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
+
   return (
     <main className="container nexusHome">
       <section className="heroCenter animate-flow-1">
@@ -221,6 +231,21 @@ export default function HomePage() {
                   <span className="signalPill neutral">{result.country}</span>
                   <span className="signalPill neutral" title={result.signal}>{result.signal.length > 30 ? result.signal.slice(0, 30) + "…" : result.signal}</span>
                 </div>
+
+                {showFillToThreshold && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="chipRow" style={{ marginBottom: 8 }}>
+                      <span className="signalPill neutral">{t("fill_to_50_badge")}</span>
+                      <span className="signalPill ok">{`${t("fill_to_50_missing_prefix")} $${missingToThreshold.toFixed(2)}`}</span>
+                    </div>
+                    <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
+                    <div className="chipRow">
+                      {fillToThresholdSuggestions.slice(0, 2).map((s) => (
+                        <span key={s.id} className="signalPill neutral">{`${s.title} · $${s.price.toFixed(2)}`}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {result && submittedForm && (
