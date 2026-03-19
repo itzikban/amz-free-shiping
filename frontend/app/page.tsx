@@ -197,9 +197,11 @@ export default function HomePage() {
       .slice(0, 2);
   }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
-  const fillToThresholdSuggestions = rankedFillCandidates.length > 0
-    ? rankedFillCandidates
-    : [];
+  const fallbackFillToThresholdSuggestions = [
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined, imageUrl: undefined },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined, imageUrl: undefined },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined, imageUrl: undefined },
+  ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
 
   const bestFillCombo = useMemo(() => {
     if (!fillToThresholdResult?.combos?.length) return null;
@@ -207,6 +209,10 @@ export default function HomePage() {
       ?? fillToThresholdResult.combos.find((combo) => combo.items.length >= 2)
       ?? null;
   }, [fillToThresholdResult?.combos]);
+
+  const fillToThresholdSuggestions = rankedFillCandidates.length > 0
+    ? rankedFillCandidates
+    : fallbackFillToThresholdSuggestions.slice(0, 2);
 
   return (
     <main className="container nexusHome">
