@@ -5,5 +5,11 @@ frontend/.env
 
 .run/
 .logs/
+
 .env
 backend/server
+
+.agent/
+.previews/
+Focus.md
+

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "35c0d9c5-a6be-45b0-af30-10c6c2cc313a",
+      "name": "mission-loop",
+      "enabled": false,
+      "deleteAfterRun": false,
+      "createdAtMs": 1773313066023,
+      "updatedAtMs": 1774000000000,
+      "schedule": {
+        "kind": "every",
+        "everyMs": 120000,
+        "anchorMs": 1773313066023
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Repo: /home/ubuntu/.openclaw/workspace/amz-free-shiping\nState file: /home/ubuntu/.openclaw/workspace/amz-free-shiping/.agent/mission-state.json\n\n## Mission Loop — unified autonomous cycle\n\n### STEP 1 — Watchdog\nRun: REPO_PATH=/home/ubuntu/.openclaw/workspace/amz-free-shiping python3 /home/ubuntu/.openclaw/scripts/babysitter_watchdog.py\n- status=OK: continue silently.\n- status=WARN or STALE: send Telegram alert (branch, ticket, head, summary), then continue.\n\n### STEP 2 — Service health\nVerify: curl -fs http://127.0.0.1:8085/health AND curl -fs http://127.0.0.1:8002/api/health\nIf either is down: run bash scripts/auto-launch.sh. If still down after launch: send alert and abort this cycle entirely.\n\n### STEP 3 — Per-PR mission loop\nLoad state from .agent/mission-state.json (keyed by PR number). For every open non-draft PR:\n\n[A] GUARD — check PR is still open\n  Re-fetch PR state. If merged or closed: call Linear API to transition the linked ticket to Done. Remove from state. Skip to next PR.\n\n[B] GUARD — dirty workspace\n  Before touching any branch: verify `git status --short` is clean in the repo.\n  If dirty: stash changes or send HUMAN-NEEDED. Never switch branches with uncommitted changes.\n\n[C] SHA CURRENCY — is CodeRabbit up to date?\n  Get current HEAD SHA for the PR (gh pr view N --json headRefOid).\n  Get latest CodeRabbit review and check its commit_id field.\n  - If no CR review exists for current HEAD SHA: this is a new push CR hasn't seen yet.\n    Post \"@coderabbitai review\" ONLY if state.last_review_request_sha != HEAD SHA.\n    Save last_review_request_sha = HEAD SHA. Stop processing this PR this cycle — wait for CR.\n  - If CR review exists for current HEAD SHA: proceed to [D].\n\n[D] STALE COMMENT FILTER\n  Fetch all CR inline comments. Discard any where position == null — these are outdated (code changed around them) and must not be acted on.\n\n[E] ACTIONABLE ASSESSMENT\n  Parse actionable count from latest CR review body (regex \"Actionable comments posted: N\").\n  - null (CR still generating): skip this PR this cycle, wait.\n  - > 0 OR non-null inline comments remain: go to [G] IMPLEMENT CR FIXES.\n  - 0 AND zero non-null inline comments: go to [F] TICKET CHECK.\n\n[F] TICKET CHECK — is the mission actually done?\n  Extract ticket ID from branch name (regex ITZ-\\d+) or .agent/branch-map.json.\n  Fetch from Linear: title, description, acceptance criteria, current state.\n  - If ticket state is Done or Cancelled: skip. No work needed.\n  - Compare acceptance criteria against current branch code carefully.\n  - If ALL criteria are met:\n    Notify: CAN MERGE — PR #N (ITZ-XX complete). UI: http://20.240.201.161:8002 and http://20.240.201.161:8002/admin\n    Save last_merge_ready_sha = HEAD SHA. Transition Linear ticket to In Review if not already.\n  - If criteria NOT fully met: go to [H] IMPLEMENT TICKET SCOPE.\n\n[G] IMPLEMENT CR FIXES\n  Checkout PR branch, pull latest.\n  Check for divergence from main: if behind, attempt `git rebase origin/main`. If conflicts: send HUMAN-NEEDED (branch, conflicting files). Do not push.\n  Implement all concrete CR fixes (actionable inline comments with non-null position) in one batch commit.\n  Run validations:\n  - `go test ./...` if any backend file touched\n  - `npm run build` if any frontend file touched\n  If validation fails: DO NOT push. Send HUMAN-NEEDED with exact error output (file, line, message).\n  If passing: commit + push.\n  Post \"@coderabbitai review\" only if new HEAD SHA != state.last_review_request_sha.\n  Save last_review_request_sha = new HEAD SHA.\n  Save same_actionable_cycles = 0.\n  Health check after push: curl both endpoints. If down: run auto-launch.sh, alert.\n\n[H] IMPLEMENT TICKET SCOPE (CR clean but mission incomplete)\n  Checkout PR branch, pull latest.\n  Work through unimplemented acceptance criteria one at a time.\n  Run validations: go test ./... and npm run build.\n  If failing: DO NOT push. Send HUMAN-NEEDED.\n  If passing: commit + push with message \"feat(ITZ-XX): <what was implemented>\".\n  Post \"@coderabbitai review\" only if new HEAD SHA != state.last_review_request_sha.\n  Save last_review_request_sha = new HEAD SHA.\n  Health check after push.\n\n[I] ESCALATION — stuck actionable\n  If same actionable count persists for same SHA across 3+ cycles (same_actionable_cycles >= 3):\n  Send HUMAN-NEEDED: PR number, exact file + line + CR comment text, reason agent is blocked.\n  Set escalated = true. Do not retry until SHA changes.\n  If actionable changes or SHA changes: reset same_actionable_cycles = 0, escalated = false.\n\n[J] SAVE STATE\n  Write updated per-PR state back to .agent/mission-state.json:\n  {\n    last_head_sha, last_cr_review_sha, last_review_request_sha,\n    last_merge_ready_sha, actionable, same_actionable_cycles,\n    escalated, ticket_id, ticket_state\n  }\n\n### STEP 4 — No open PRs (Linear-driven new work)\n  Query Linear for tickets in In Progress state.\n  For each: check if a branch or PR matching ITZ-{id} already exists before creating one.\n  If no branch/PR exists: create branch ITZ-{id}-{slug}, implement initial scaffold based on ticket description + acceptance criteria, open draft PR.\n  If no In Progress tickets: true NOOP — stay silent.\n\n## Output policy\n- Silent on full NOOP (nothing changed, services healthy, watchdog OK).\n- Speak only for: fix pushed, ticket impl pushed, human-needed, can-merge, watchdog alert, service down, new branch started, ticket marked done.\n- All non-NOOP events → Telegram to 347830791.",
+        "thinking": "low",
+        "timeoutSeconds": 900
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "last",
+        "to": "347830791",
+        "bestEffort": true
+      },
+      "state": {
+        "lastRunAtMs": 1773896626923,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 6401,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0,
+        "lastDelivered": true
+      }
+    }
+  ]
+}
