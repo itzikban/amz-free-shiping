@@ -197,11 +197,11 @@ export default function HomePage() {
       .slice(0, 2);
   }, [fillToThresholdResult?.suggestions, missingToThreshold, result?.alternatives, showFillToThreshold]);
 
-  const fallbackFillToThresholdSuggestions = [
-    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: undefined, imageUrl: undefined },
-    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: undefined, imageUrl: undefined },
-    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: undefined, imageUrl: undefined },
-  ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold));
+  const fallbackFillToThresholdSuggestions = useMemo(() => [
+    { id: "ft1", title: t("fill_to_50_item_1"), price: 5.99, url: `https://www.amazon.com/s?k=${encodeURIComponent(t("fill_to_50_item_1"))}`, imageUrl: undefined },
+    { id: "ft2", title: t("fill_to_50_item_2"), price: 9.99, url: `https://www.amazon.com/s?k=${encodeURIComponent(t("fill_to_50_item_2"))}`, imageUrl: undefined },
+    { id: "ft3", title: t("fill_to_50_item_3"), price: 14.99, url: `https://www.amazon.com/s?k=${encodeURIComponent(t("fill_to_50_item_3"))}`, imageUrl: undefined },
+  ].sort((a, b) => Math.abs(a.price - missingToThreshold) - Math.abs(b.price - missingToThreshold)), [t, missingToThreshold]);
 
   const bestFillCombo = useMemo(() => {
     if (!fillToThresholdResult?.combos?.length) return null;
@@ -308,7 +308,14 @@ export default function HomePage() {
                           const card = (
                             <>
                               {s.imageUrl ? (
-                                <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} />
+                                <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} onError={(e) => {
+                                  const img = e.currentTarget;
+                                  img.style.display = 'none';
+                                  const parent = img.parentElement;
+                                  if (parent && !parent.classList.contains('img-placeholder-2')) {
+                                    parent.classList.add('img-placeholder-2');
+                                  }
+                                }} />
                               ) : (
                                 <div className="recImage img-placeholder-2" />
                               )}
@@ -394,7 +401,14 @@ export default function HomePage() {
                     <div className={`recImage ${r.cls}`} />
                   ) : (
                     r.imageUrl ? (
-                      <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} />
+                      <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} onError={(e) => {
+                        const img = e.currentTarget;
+                        img.style.display = 'none';
+                        const parent = img.parentElement;
+                        if (parent && !parent.classList.contains('img-placeholder-2')) {
+                          parent.classList.add('img-placeholder-2');
+                        }
+                      }} />
                     ) : (
                       <div className="recImage img-placeholder-1" />
                     )

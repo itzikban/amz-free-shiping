@@ -341,7 +341,7 @@ func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery stri
 				alt := Alternative{
 					ASIN:         asin,
 					Title:        title,
-					URL:          fmt.Sprintf("https://amazon.com/dp/%s", asin),
+					URL:          fmt.Sprintf("https://www.amazon.com/dp/%s", asin),
 					ImageURL:     imageURL,
 					PriceUSD:     price,
 					FreeShipping: freeShipping,
@@ -405,7 +405,7 @@ func generateDemoAlternatives(productTitle string, productASIN string) []Alterna
 		alts = append(alts, Alternative{
 			ASIN:         p.asin,
 			Title:        p.title,
-			URL:          fmt.Sprintf("https://amazon.com/dp/%s", p.asin),
+			URL:          fmt.Sprintf("https://www.amazon.com/dp/%s", p.asin),
 			ImageURL:     p.imageURL,
 			PriceUSD:     p.price,
 			FreeShipping: true,

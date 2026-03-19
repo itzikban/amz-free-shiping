@@ -315,6 +315,16 @@ main() {
   start_socat_forward "$FRONTEND_HOST" "$FRONTEND_PORT" "$PUBLIC_FRONTEND_PORT" "$SOCAT_FRONTEND_LOG" "$SOCAT_FRONTEND_PID_FILE" "frontend"
 
   print_summary
+
+  if [[ -f "$ROOT_DIR/scripts/sanity-test.sh" ]]; then
+    log "Running sanity tests..."
+    if bash "$ROOT_DIR/scripts/sanity-test.sh"; then
+      log "Sanity tests PASSED"
+    else
+      log "WARNING: Sanity tests FAILED — check logs above"
+    fi
+  fi
+
   log "Done"
 }
 

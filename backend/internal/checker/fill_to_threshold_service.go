@@ -2,6 +2,7 @@ package checker
 
 import (
 	"context"
+	"log"
 	"net/url"
 	"strings"
 )
@@ -15,6 +16,8 @@ func (s *Service) BuildFillToThresholdForURL(ctx context.Context, productURL, co
 		return FillToThresholdResponse{}, err
 	}
 
+	// Start with whatever alternatives the check already returned (may be empty when
+	// FreeShippingCountry=true because enrichWithAlternatives skips that case).
 	alts := res.Alternatives
 
 	// Prefer Decodo markdown alternatives for this feature when they are available.
@@ -23,6 +26,17 @@ func (s *Service) BuildFillToThresholdForURL(ctx context.Context, productURL, co
 		domain := amazonDomainOrDefault(productURL)
 		if dAlts, derr := s.decodoFetchAlternatives(ctx, asin, domain); derr == nil && len(dAlts) > 0 {
 			alts = dAlts
+		}
+	}
+
+	// If still no alternatives (e.g. FreeShippingCountry=true skipped enrichWithAlternatives,
+	// or Decodo returned nothing), fall back to the Amazon scraper using the product title.
+	if len(alts) == 0 && res.Title != "" {
+		log.Printf("[DEBUG] fill-to-threshold: no alternatives yet, falling back to scraper for: %s", res.Title)
+		if scraped, serr := s.scrapeAmazonAlternatives(ctx, res.Title); serr == nil && len(scraped) > 0 {
+			alts = scraped
+		} else if serr != nil {
+			log.Printf("[DEBUG] fill-to-threshold: scraper fallback failed: %v", serr)
 		}
 	}
 
