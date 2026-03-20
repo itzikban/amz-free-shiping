@@ -39,7 +39,10 @@ func BuildFillToThreshold(currentPrice, threshold float64, alternatives []Altern
 
 	suggestions := make([]FillSuggestion, 0, len(alternatives))
 	for _, alt := range alternatives {
-		if alt.PriceUSD <= 0 || alt.PriceUSD > threshold {
+		// Allow items up to 3× the threshold — items above the threshold are
+		// "buy this instead and qualify for free shipping" suggestions, not add-ons.
+		// Items massively above threshold (3×) are unlikely to be useful.
+		if alt.PriceUSD <= 0 || alt.PriceUSD > threshold*3 {
 			continue
 		}
 		suggestions = append(suggestions, FillSuggestion{

@@ -22,17 +22,23 @@ func TestBuildFillToThreshold_SortsSuggestionsByScoreAndCloseness(t *testing.T) 
 }
 
 func TestBuildFillToThreshold_ExcludesSinglesAboveThreshold(t *testing.T) {
+	// Items up to 3× the threshold are included as "buy instead and qualify for free shipping" suggestions.
+	// Items above 3× are excluded as unreasonably expensive.
 	alts := []Alternative{
-		{ASIN: "A1", Title: "A1", PriceUSD: 55.00, URL: "https://amazon.com/dp/A1", FreeShipping: true},
-		{ASIN: "A2", Title: "A2", PriceUSD: 9.99, URL: "https://amazon.com/dp/A2", FreeShipping: true},
+		{ASIN: "A1", Title: "A1", PriceUSD: 55.00, URL: "https://amazon.com/dp/A1", FreeShipping: true},   // included: 55 < 50*3=150
+		{ASIN: "A2", Title: "A2", PriceUSD: 9.99, URL: "https://amazon.com/dp/A2", FreeShipping: true},    // included
+		{ASIN: "A3", Title: "A3", PriceUSD: 200.00, URL: "https://amazon.com/dp/A3", FreeShipping: true},  // excluded: 200 > 50*3=150
 	}
 
 	resp := BuildFillToThreshold(40.0, 50.0, alts)
-	if len(resp.Suggestions) != 1 {
-		t.Fatalf("expected 1 suggestion under threshold, got %d", len(resp.Suggestions))
+	if len(resp.Suggestions) != 2 {
+		t.Fatalf("expected 2 suggestions (A1 and A2), got %d", len(resp.Suggestions))
 	}
-	if resp.Suggestions[0].ASIN != "A2" {
-		t.Fatalf("expected remaining suggestion A2, got %s", resp.Suggestions[0].ASIN)
+	// A3 at $200 should be excluded
+	for _, s := range resp.Suggestions {
+		if s.ASIN == "A3" {
+			t.Fatalf("expected A3 ($200, >3× threshold) to be excluded")
+		}
 	}
 }
 

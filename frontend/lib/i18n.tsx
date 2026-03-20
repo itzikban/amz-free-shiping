@@ -20,7 +20,7 @@ const dictionaries = {
     home_zip_placeholder: "ZIP",
     home_analyze: "Analyze",
     home_target_analysis: "Target Analysis",
-    home_alert_cta_disabled: "Alert feature coming soon",
+    home_alert_cta_disabled: "Price drop alerts — coming soon",
     home_coming_soon_short: "Coming soon",
     home_flow_hint: "While you wait, we found alternatives with free shipping",
     home_demo_label: "Demo",
