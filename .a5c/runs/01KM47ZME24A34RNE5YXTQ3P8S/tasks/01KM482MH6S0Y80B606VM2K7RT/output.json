@@ -1,6 +1,0 @@
-{
-  "fixed": true,
-  "filesChanged": ["backend/internal/checker/checker.go", "backend/internal/checker/fill_to_threshold_service.go"],
-  "buildPassed": true,
-  "changesSummary": "BuildFillToThresholdForURL now falls back to scrapeAmazonAlternatives when Decodo+checker both return empty. Fixed hardcoded amazon.com to www.amazon.com in both scraper and demo paths."
-}

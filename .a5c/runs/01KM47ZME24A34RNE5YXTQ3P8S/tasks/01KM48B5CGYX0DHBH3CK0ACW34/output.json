@@ -1,1 +1,0 @@
-{"testsCreated": ["scripts/sanity-test.sh", "backend/internal/checker/fill_to_threshold_sanity_test.go"], "sanityScriptPath": "scripts/sanity-test.sh", "allTestsPassed": true}
