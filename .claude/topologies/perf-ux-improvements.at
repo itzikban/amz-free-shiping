@@ -133,7 +133,7 @@ topology perf-ux-improvements : [fan-out] {
 
   agent qa-reviewer {
     model: opus
-    permissions: supervised
+    permissions: autonomous
     phase: 3
     join: all
     description: "Reviews all changes for correctness. Routes fixes back to the specific engineer(s) who need to address them — up to 2 fix rounds before escalating."

@@ -1,39 +1,35 @@
 {
-  "source": "coderabbit-pingpong.at",
-  "sourceHash": "0f0f08f80c4941ad732b6cf7c8f2389bc6e3a9b7e91c11b32bd3e46b08cc1658",
+  "source": "perf-ux-improvements.at",
+  "sourceHash": "94e876fcd22d43985aa07b85b161c5bdda1c84668fdc09f3da3cb940b3a3dac0",
   "target": "claude-code",
-  "generatedAt": "2026-03-20T22:48:34.178Z",
+  "generatedAt": "2026-03-20T23:39:05.931Z",
   "files": {
-    ".claude/skills/coderabbit-pingpong/scripts/action-done.sh": {
-      "hash": "3a50984041d0a30d8e5cfb21928c40f4509f3d9f7dc75a23351e64ba5061f62d",
-      "category": "script"
-    },
-    ".claude/agents/pr-scanner/AGENT.md": {
-      "hash": "97fb483c938845af08329f4308724d7a43ac3bb80ccf3c35d1780f5526ffa9af",
+    ".claude/agents/coordinator/AGENT.md": {
+      "hash": "a36aba7b7135dbbfb5bcfd61e234676e8506ed94b9f24a9175ea2c45ce5dc418",
       "category": "agent"
     },
-    ".claude/agents/pr-reader/AGENT.md": {
-      "hash": "772d27538b4bec5eb524b21d2d8f863650546f4357370232ba9c31c8fe773129",
+    ".claude/agents/frontend-engineer/AGENT.md": {
+      "hash": "b7b0bcc2dd955ec7862999422d966eed2e264f5731787a309abeabc46284e1ab",
       "category": "agent"
     },
-    ".claude/agents/code-fixer/AGENT.md": {
-      "hash": "704c94588487284dabb27cec7c13300fbb9a447355e7cb00dd48ada3e84bd7f6",
+    ".claude/agents/backend-engineer/AGENT.md": {
+      "hash": "16585fa3ed321495008cda906b8c4f5b138910f7aa32fa34457b48f8e95aaec8",
       "category": "agent"
     },
-    ".claude/agents/commit-pusher/AGENT.md": {
-      "hash": "dc2e075c2a054f375306ef1bf943393053b95108cb5fcee6015b6c4103ff4fb1",
+    ".claude/agents/qa-reviewer/AGENT.md": {
+      "hash": "350b95287a164a0501782eee10edd1b3dfebd88a609834bc2d2e9882ce9f3871",
       "category": "agent"
     },
-    ".claude/agents/coderabbit-watcher/AGENT.md": {
-      "hash": "6a62268019d1ef4add645aca716c898422fe30fa441670cc7b142014863f06a5",
+    ".claude/agents/reporter/AGENT.md": {
+      "hash": "d6443615ee954b937af9e1fdcac383b75af1e7bc347a000985c315b76e32396e",
       "category": "agent"
     },
-    ".claude/skills/coderabbit-pingpong/SKILL.md": {
-      "hash": "6fbe7a6c0471ea482b3af6f370d17b7a0d78a2d183e008fcaff31f9c70b6ae00",
+    ".claude/skills/perf-ux-improvements/SKILL.md": {
+      "hash": "3d8f8bbf1ac333d611191f4d79c091bea20fe41c4c988e9986e74a78b2e604f4",
       "category": "agent"
     },
     ".claude/CONTEXT.md": {
-      "hash": "383bdd8084040d7e51111c05c0f77e0e1ac346fb20ddfd43831a36ca7d35368d",
+      "hash": "62676f82ae9e6c4ec7796799a0b1b644d9126e18bb92701e546caf46dd3424ac",
       "category": "machine"
     }
   }

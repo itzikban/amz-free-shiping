@@ -1,7 +1,7 @@
-# Coderabbit Pingpong
+# Perf Ux Improvements
 
-Fully autonomous ping-pong loop across ALL open PRs: scan every PR for CodeRabbit comments, fix all of them, push, wait for re-review, repeat until each PR is clean.
+Parallel performance and UX fix agents for the amz-free-shipping app — engineers consult each other when needed, QA routes fixes back to the right engineer.
 
-Version: 1.0.0
-Patterns: pipeline
+Version: 2.0.0
+Patterns: fan-out
 

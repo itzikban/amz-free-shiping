@@ -7,7 +7,6 @@ tools:
   - Grep
   - Glob
   - Bash
-permissionMode: plan
 ---
 
 ## Instructions

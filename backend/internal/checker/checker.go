@@ -92,9 +92,10 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 	asin := extractASINFromURL(res.URL)
 	log.Printf("[DEBUG] extracted ASIN: %s", asin)
 
-	// Check cache first (if available)
-	if s.AltCache != nil && asin != "" {
-		if alts, ok := s.AltCache.Get(ctx, asin); ok {
+	// Check cache first (if available); key is composite: host:asin to avoid cross-marketplace collisions
+	cacheKey := alternativeCacheKey(res.URL, asin)
+	if s.AltCache != nil && cacheKey != "" {
+		if alts, ok := s.AltCache.Get(ctx, cacheKey); ok {
 			res.Alternatives = alts
 			return res, nil
 		}
@@ -154,9 +155,9 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 
 	if err == nil && len(alts) > 0 {
 		res.Alternatives = alts
-		// Write to cache (if available)
-		if s.AltCache != nil && asin != "" {
-			s.AltCache.Put(ctx, asin, res.Title, alts)
+		// Write to cache (if available); use composite key: host:asin
+		if s.AltCache != nil && cacheKey != "" {
+			s.AltCache.Put(ctx, cacheKey, res.Title, alts)
 		}
 	}
 	// Silently ignore PA-API/scraper errors — it's a bonus feature
@@ -192,6 +193,19 @@ var knownAmazonHosts = map[string]bool{
 // isKnownAmazonHost returns true if host is a recognized Amazon marketplace hostname.
 func isKnownAmazonHost(host string) bool {
 	return knownAmazonHosts[strings.ToLower(host)]
+}
+
+// alternativeCacheKey returns a composite cache key of the form "host:asin".
+// This prevents cross-marketplace cache collisions for the same ASIN.
+// If the ASIN is empty, an empty string is returned to signal "no caching".
+func alternativeCacheKey(rawURL, asin string) string {
+	if asin == "" {
+		return ""
+	}
+	if u, err := url.Parse(rawURL); err == nil && isKnownAmazonHost(u.Host) {
+		return strings.ToLower(u.Host) + ":" + asin
+	}
+	return "www.amazon.com:" + asin
 }
 
 // extractASINFromURL extracts ASIN from various Amazon URL formats
@@ -530,6 +544,7 @@ func (s *Service) checkSingleEuropeanCountry(ctx context.Context, asin, countryC
 		return Result{}, readErr
 	}
 	res := AnalyzeHTML(euroURL, countryCode, string(body))
+	res.Method = "http"
 	if res.FreeShippingCountry {
 		return res, nil
 	}
@@ -633,6 +648,13 @@ func AnalyzeHTML(url, country, html string) Result {
 		"NL": {"gratis verzending", "kosteloze levering"},
 		"FR": {"livraison gratuite", "expédition gratuite"},
 	}
+	// negativeCountryPatterns must be checked BEFORE positive matches to avoid false positives
+	// where localized "no free shipping" text contains a positive keyword as a substring.
+	negativeCountryPatterns := map[string][]string{
+		"DE": {"keine kostenlose", "kein kostenloser", "keine versandkostenfreiheit", "nicht versandkostenfrei"},
+		"NL": {"geen gratis verzending", "geen gratis levering", "niet gratis verzonden"},
+		"FR": {"pas de livraison gratuite", "pas de frais de livraison offerts", "livraison non offerte"},
+	}
 	freeGeneralPatterns := []string{
 		"free shipping",
 		"free delivery",
@@ -668,12 +690,22 @@ func AnalyzeHTML(url, country, html string) Result {
 		}
 	}
 
-	for _, p := range countryPatterns[country] {
-		if strings.Contains(lower, p) {
-			res.FreeShippingCountry = true
-			res.FreeShipping = true
-			res.Signal = p
-			return res
+	// Check negative patterns first to avoid false positives from localized "no free shipping" text.
+	negativeMatch := false
+	for _, neg := range negativeCountryPatterns[country] {
+		if strings.Contains(lower, neg) {
+			negativeMatch = true
+			break
+		}
+	}
+	if !negativeMatch {
+		for _, p := range countryPatterns[country] {
+			if strings.Contains(lower, p) {
+				res.FreeShippingCountry = true
+				res.FreeShipping = true
+				res.Signal = p
+				return res
+			}
 		}
 	}
 
@@ -688,7 +720,15 @@ func AnalyzeHTML(url, country, html string) Result {
 	// Small DOM fallback for common selectors.
 	if docErr == nil {
 		txt := strings.ToLower(strings.TrimSpace(doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE").Text()))
-		if strings.Contains(txt, "free") || strings.Contains(txt, "kostenlos") || strings.Contains(txt, "kostenfreie") || strings.Contains(txt, "gratis") || strings.Contains(txt, "livraison gratuite") {
+		// Before checking positive signals in the delivery block, verify no negative pattern matches.
+		deliveryBlockNegative := false
+		for _, neg := range negativeCountryPatterns[country] {
+			if strings.Contains(txt, neg) {
+				deliveryBlockNegative = true
+				break
+			}
+		}
+		if !deliveryBlockNegative && (strings.Contains(txt, "free") || strings.Contains(txt, "kostenlos") || strings.Contains(txt, "kostenfreie") || strings.Contains(txt, "gratis") || strings.Contains(txt, "livraison gratuite")) {
 			if country == "IL" && strings.Contains(txt, "israel") {
 				res.FreeShippingCountry = true
 				res.FreeShipping = true
