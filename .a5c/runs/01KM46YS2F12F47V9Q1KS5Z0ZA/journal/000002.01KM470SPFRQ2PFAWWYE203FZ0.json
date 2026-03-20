@@ -1,0 +1,15 @@
+{
+  "type": "EFFECT_REQUESTED",
+  "recordedAt": "2026-03-19T23:31:17.327Z",
+  "data": {
+    "effectId": "01KM470SNE8JGW5SP94C9PGKH5",
+    "invocationKey": "branch-merge-align:S000001:analyse-branch-diff",
+    "invocationHash": "1baf14e78da770f24597b5b3e06f65652540046a7a9a0b66cb496726c7cef75b",
+    "stepId": "S000001",
+    "taskId": "analyse-branch-diff",
+    "kind": "agent",
+    "label": "Analyse branch differences",
+    "taskDefRef": "tasks/01KM470SNE8JGW5SP94C9PGKH5/task.json"
+  },
+  "checksum": "f5d8460da25b4e7fcd02d92dd1684254f7e7147b91a2c4cc529254ec05d4eecf"
+}

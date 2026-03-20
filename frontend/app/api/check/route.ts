@@ -38,10 +38,10 @@ export async function GET(req: NextRequest) {
     try {
       body = JSON.parse(raw) as Record<string, unknown>;
     } catch {
-      body = {
-        error: "backend_invalid_response",
-        detail: raw.slice(0, 300),
-      };
+      return NextResponse.json(
+        { error: "backend_invalid_response" },
+        { status: 502 }
+      );
     }
 
     // Strip internal details before sending to client

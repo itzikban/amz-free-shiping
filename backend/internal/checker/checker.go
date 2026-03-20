@@ -223,12 +223,7 @@ func (s *Service) scrapeAmazonAlternatives(ctx context.Context, searchQuery stri
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Connection", "keep-alive")
 
-	client := s.Client
-	if client == nil {
-		client = &http.Client{Timeout: 20 * time.Second}
-		s.Client = client
-	}
-	resp, err := client.Do(req)
+	resp, err := s.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}
@@ -493,12 +488,7 @@ func (s *Service) checkSingleEuropeanCountry(ctx context.Context, asin, countryC
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
 
-	client := s.Client
-	if client == nil {
-		client = &http.Client{Timeout: 20 * time.Second}
-		s.Client = client
-	}
-	resp, err := client.Do(req)
+	resp, err := s.Client.Do(req)
 	if err != nil {
 		return Result{}, err
 	}

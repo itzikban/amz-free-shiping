@@ -1,0 +1,40 @@
+{
+  "source": "coderabbit-pingpong.at",
+  "sourceHash": "0f0f08f80c4941ad732b6cf7c8f2389bc6e3a9b7e91c11b32bd3e46b08cc1658",
+  "target": "claude-code",
+  "generatedAt": "2026-03-20T22:48:34.178Z",
+  "files": {
+    ".claude/skills/coderabbit-pingpong/scripts/action-done.sh": {
+      "hash": "3a50984041d0a30d8e5cfb21928c40f4509f3d9f7dc75a23351e64ba5061f62d",
+      "category": "script"
+    },
+    ".claude/agents/pr-scanner/AGENT.md": {
+      "hash": "97fb483c938845af08329f4308724d7a43ac3bb80ccf3c35d1780f5526ffa9af",
+      "category": "agent"
+    },
+    ".claude/agents/pr-reader/AGENT.md": {
+      "hash": "772d27538b4bec5eb524b21d2d8f863650546f4357370232ba9c31c8fe773129",
+      "category": "agent"
+    },
+    ".claude/agents/code-fixer/AGENT.md": {
+      "hash": "704c94588487284dabb27cec7c13300fbb9a447355e7cb00dd48ada3e84bd7f6",
+      "category": "agent"
+    },
+    ".claude/agents/commit-pusher/AGENT.md": {
+      "hash": "dc2e075c2a054f375306ef1bf943393053b95108cb5fcee6015b6c4103ff4fb1",
+      "category": "agent"
+    },
+    ".claude/agents/coderabbit-watcher/AGENT.md": {
+      "hash": "6a62268019d1ef4add645aca716c898422fe30fa441670cc7b142014863f06a5",
+      "category": "agent"
+    },
+    ".claude/skills/coderabbit-pingpong/SKILL.md": {
+      "hash": "6fbe7a6c0471ea482b3af6f370d17b7a0d78a2d183e008fcaff31f9c70b6ae00",
+      "category": "agent"
+    },
+    ".claude/CONTEXT.md": {
+      "hash": "383bdd8084040d7e51111c05c0f77e0e1ac346fb20ddfd43831a36ca7d35368d",
+      "category": "machine"
+    }
+  }
+}

@@ -37,6 +37,16 @@ func BuildFillToThreshold(currentPrice, threshold float64, alternatives []Altern
 		missing = 0
 	}
 
+	// Already at or above threshold — no boosters needed.
+	if missing == 0 {
+		return FillToThresholdResponse{
+			CurrentPrice:  currentPrice,
+			MissingAmount: 0,
+			Suggestions:   []FillSuggestion{},
+			Combos:        []FillCombo{},
+		}
+	}
+
 	suggestions := make([]FillSuggestion, 0, len(alternatives))
 	for _, alt := range alternatives {
 		// Allow items up to 3× the threshold — items above the threshold are
@@ -87,14 +97,20 @@ func buildCombos(suggestions []FillSuggestion, missing float64) []FillCombo {
 
 	for i := 0; i < maxN; i++ {
 		// Include 1-item combos so the API can return combo bundles of size 1..3.
-		combos = append(combos, scoreCombo([]FillSuggestion{suggestions[i]}, missing))
+		if c := scoreCombo([]FillSuggestion{suggestions[i]}, missing); c.Total >= missing {
+			combos = append(combos, c)
+		}
 
 		for j := i + 1; j < maxN; j++ {
 			items := []FillSuggestion{suggestions[i], suggestions[j]}
-			combos = append(combos, scoreCombo(items, missing))
+			if c := scoreCombo(items, missing); c.Total >= missing {
+				combos = append(combos, c)
+			}
 			for k := j + 1; k < maxN; k++ {
 				items3 := []FillSuggestion{suggestions[i], suggestions[j], suggestions[k]}
-				combos = append(combos, scoreCombo(items3, missing))
+				if c := scoreCombo(items3, missing); c.Total >= missing {
+					combos = append(combos, c)
+				}
 			}
 		}
 	}

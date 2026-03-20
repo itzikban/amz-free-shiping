@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "2026.01.results-v1",
+  "effectId": "01KM48B5CGYX0DHBH3CK0ACW34",
+  "taskId": "create-tests",
+  "invocationKey": "fix-fill-images-links:S000005:create-tests",
+  "status": "ok",
+  "result": {
+    "allTestsPassed": true,
+    "sanityScriptPath": "scripts/sanity-test.sh",
+    "testsCreated": [
+      "scripts/sanity-test.sh",
+      "backend/internal/checker/fill_to_threshold_sanity_test.go"
+    ]
+  },
+  "startedAt": "2026-03-19T23:56:04.238Z",
+  "finishedAt": "2026-03-19T23:56:04.238Z",
+  "value": {
+    "allTestsPassed": true,
+    "sanityScriptPath": "scripts/sanity-test.sh",
+    "testsCreated": [
+      "scripts/sanity-test.sh",
+      "backend/internal/checker/fill_to_threshold_sanity_test.go"
+    ]
+  }
+}

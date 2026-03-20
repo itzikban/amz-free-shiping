@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "2026.01.tasks-v1",
+  "effectId": "01KM489SJMS992MDJ4Q5BMJF0C",
+  "taskId": "build-validate",
+  "invocationKey": "fix-fill-images-links:S000004:build-validate",
+  "stepId": "S000004",
+  "kind": "agent",
+  "title": "Full build validation — frontend + backend",
+  "io": {
+    "inputJsonPath": "tasks/01KM489SJMS992MDJ4Q5BMJF0C/input.json",
+    "outputJsonPath": "tasks/01KM489SJMS992MDJ4Q5BMJF0C/result.json"
+  },
+  "inputs": {
+    "repoDir": "/home/ubuntu/.openclaw/workspace/amz-free-shiping"
+  }
+}

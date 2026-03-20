@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/url"
-	"strings"
 )
 
 // BuildFillToThresholdForURL resolves a product check and then builds ranked top-up suggestions.
@@ -20,12 +19,15 @@ func (s *Service) BuildFillToThresholdForURL(ctx context.Context, productURL, co
 	// FreeShippingCountry=true because enrichWithAlternatives skips that case).
 	alts := res.Alternatives
 
-	// Prefer Decodo markdown alternatives for this feature when they are available.
-	asin := extractASINorURL(productURL)
-	if len(asin) == 10 {
-		domain := amazonDomainOrDefault(productURL)
-		if dAlts, derr := s.decodoFetchAlternatives(ctx, asin, domain); derr == nil && len(dAlts) > 0 {
-			alts = dAlts
+	// Only attempt additional alternative fetches if the first call returned none.
+	if len(alts) == 0 {
+		// Prefer Decodo markdown alternatives for this feature when they are available.
+		asin := extractASINorURL(productURL)
+		if len(asin) == 10 {
+			domain := amazonDomainOrDefault(productURL)
+			if dAlts, derr := s.decodoFetchAlternatives(ctx, asin, domain); derr == nil && len(dAlts) > 0 {
+				alts = dAlts
+			}
 		}
 	}
 
@@ -43,13 +45,37 @@ func (s *Service) BuildFillToThresholdForURL(ctx context.Context, productURL, co
 	return BuildFillToThreshold(res.PriceUSD, threshold, alts), nil
 }
 
+// knownAmazonDomains is the strict allowlist of verified Amazon marketplace hostnames.
+var knownAmazonDomains = map[string]bool{
+	"www.amazon.com":    true,
+	"www.amazon.co.uk":  true,
+	"www.amazon.de":     true,
+	"www.amazon.fr":     true,
+	"www.amazon.it":     true,
+	"www.amazon.es":     true,
+	"www.amazon.nl":     true,
+	"www.amazon.co.jp":  true,
+	"www.amazon.ca":     true,
+	"www.amazon.com.au": true,
+	"www.amazon.com.br": true,
+	"www.amazon.com.mx": true,
+	"www.amazon.in":     true,
+	"www.amazon.sg":     true,
+	"www.amazon.ae":     true,
+	"www.amazon.sa":     true,
+	"www.amazon.se":     true,
+	"www.amazon.pl":     true,
+	"www.amazon.be":     true,
+	"www.amazon.tr":     true,
+}
+
 func amazonDomainOrDefault(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Hostname() == "" {
 		return "www.amazon.com"
 	}
-	h := strings.ToLower(u.Hostname())
-	if strings.Contains(h, "amazon.") {
+	h := u.Hostname()
+	if knownAmazonDomains[h] {
 		return h
 	}
 	return "www.amazon.com"

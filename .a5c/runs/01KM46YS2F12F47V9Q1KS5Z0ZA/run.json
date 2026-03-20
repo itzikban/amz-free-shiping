@@ -1,0 +1,14 @@
+{
+  "runId": "01KM46YS2F12F47V9Q1KS5Z0ZA",
+  "request": "branch-merge-align",
+  "processId": "branch-merge-align",
+  "entrypoint": {
+    "importPath": "../../processes/branch-merge-align.js",
+    "exportName": "process"
+  },
+  "processPath": "../../processes/branch-merge-align.js",
+  "layoutVersion": "2026.01-storage-preview",
+  "createdAt": "2026-03-19T23:30:11.176Z",
+  "prompt": "Merge and align feat/fill-to-50-basket-booster into ITZ-54-feat/fill-to-50-basket-booster. The feat/ branch has 3 commits (ranking improvements, clickable suggestions, captcha noise fixes) that are missing from ITZ-54-feat/. Merge them in, resolve any conflicts (preserving all features from both branches), validate the build, and push.",
+  "completionProof": "41096344f58344aff6b6db1886fe3500"
+}

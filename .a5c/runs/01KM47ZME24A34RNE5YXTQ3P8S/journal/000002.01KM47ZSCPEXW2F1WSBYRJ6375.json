@@ -1,0 +1,15 @@
+{
+  "type": "EFFECT_REQUESTED",
+  "recordedAt": "2026-03-19T23:48:12.822Z",
+  "data": {
+    "effectId": "01KM47ZSBTDTAHSXD5QV1CMQSX",
+    "invocationKey": "fix-fill-images-links:S000001:diagnose-api",
+    "invocationHash": "22454843439c24800fc5666d188ab427d315a89566f371e2c14c50a2375dad0c",
+    "stepId": "S000001",
+    "taskId": "diagnose-api",
+    "kind": "agent",
+    "label": "Diagnose live API — check what backend actually returns for NL scenario",
+    "taskDefRef": "tasks/01KM47ZSBTDTAHSXD5QV1CMQSX/task.json"
+  },
+  "checksum": "1854501ef42f0a871cecfabe8e57d8eb2a1d1bae170e71eb84c4f8927dac4ea8"
+}

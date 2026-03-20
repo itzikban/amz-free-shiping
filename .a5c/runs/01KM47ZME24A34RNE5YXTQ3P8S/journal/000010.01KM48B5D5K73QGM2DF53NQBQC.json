@@ -1,0 +1,15 @@
+{
+  "type": "EFFECT_REQUESTED",
+  "recordedAt": "2026-03-19T23:54:25.573Z",
+  "data": {
+    "effectId": "01KM48B5CGYX0DHBH3CK0ACW34",
+    "invocationKey": "fix-fill-images-links:S000005:create-tests",
+    "invocationHash": "112ebcf2a77680b1735942bc19a5012233a46e5d8604528b5c056647511c4c91",
+    "stepId": "S000005",
+    "taskId": "create-tests",
+    "kind": "agent",
+    "label": "Create E2E and integration tests for fill-to-threshold suggestion cards",
+    "taskDefRef": "tasks/01KM48B5CGYX0DHBH3CK0ACW34/task.json"
+  },
+  "checksum": "7906fa3220d3bf032fe60907f2f531bdc0792ae717f414c4e47036fc2e488176"
+}

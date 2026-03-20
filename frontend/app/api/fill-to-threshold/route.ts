@@ -21,24 +21,30 @@ export async function GET(req: NextRequest) {
   if (method) backendUrl.searchParams.set("method", method);
 
   try {
-    const res = await fetch(backendUrl, { method: "GET", cache: "no-store" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await fetch(backendUrl, { method: "GET", cache: "no-store", signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const raw = await res.text();
 
     try {
       const body = JSON.parse(raw);
       return NextResponse.json(body, { status: res.status });
     } catch {
+      // Backend returned a non-JSON body (e.g. HTML error page).
       return NextResponse.json(
-        {
-          error: "backend_invalid_response",
-          detail: raw.slice(0, 300),
-        },
-        { status: 502 }
+        { error: "backend_invalid_response" },
+        { status: 422 }
       );
     }
-  } catch (err) {
+  } catch {
+    // Backend is unreachable or request timed out.
     return NextResponse.json(
-      { error: "backend_unreachable", detail: err instanceof Error ? err.message : "unknown" },
+      { error: "backend_unreachable" },
       { status: 502 }
     );
   }

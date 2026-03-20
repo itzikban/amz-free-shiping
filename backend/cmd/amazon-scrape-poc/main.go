@@ -250,7 +250,6 @@ func fetchShippingInfo(p *ScrapedProduct) error {
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Cookie", "i18n-prefs=USD; lc-main=en_US; ubid-main=130-0000000-0000000; session-id=130-0000000-0000000")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)

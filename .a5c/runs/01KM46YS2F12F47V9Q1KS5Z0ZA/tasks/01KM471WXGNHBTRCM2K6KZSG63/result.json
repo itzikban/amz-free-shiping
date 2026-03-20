@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "2026.01.results-v1",
+  "effectId": "01KM471WXGNHBTRCM2K6KZSG63",
+  "taskId": "merge-and-resolve",
+  "invocationKey": "branch-merge-align:S000002:merge-and-resolve",
+  "status": "ok",
+  "result": {
+    "conflictCount": 2,
+    "headSha": "11598e47eac34c5d133dfce899d1e47a2231d7fd",
+    "resolvedFiles": [
+      "frontend/app/page.tsx"
+    ],
+    "success": true
+  },
+  "startedAt": "2026-03-19T23:34:00.850Z",
+  "finishedAt": "2026-03-19T23:34:00.850Z",
+  "value": {
+    "conflictCount": 2,
+    "headSha": "11598e47eac34c5d133dfce899d1e47a2231d7fd",
+    "resolvedFiles": [
+      "frontend/app/page.tsx"
+    ],
+    "success": true
+  }
+}

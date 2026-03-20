@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "2026.01.tasks-v1",
+  "effectId": "01KM48EW16QQEX1G8JKYCWF2MD",
+  "taskId": "create-ci-workflow",
+  "invocationKey": "fix-fill-images-links:S000007:create-ci-workflow",
+  "stepId": "S000007",
+  "kind": "agent",
+  "title": "Create GitHub Actions CI workflow for PR validation",
+  "io": {
+    "inputJsonPath": "tasks/01KM48EW16QQEX1G8JKYCWF2MD/input.json",
+    "outputJsonPath": "tasks/01KM48EW16QQEX1G8JKYCWF2MD/result.json"
+  },
+  "inputs": {
+    "repoDir": "/home/ubuntu/.openclaw/workspace/amz-free-shiping"
+  }
+}

@@ -1,0 +1,235 @@
+topology coderabbit-pingpong : [pipeline] {
+  meta {
+    version: "1.0.0"
+    description: "Fully autonomous ping-pong loop across ALL open PRs: scan every PR for CodeRabbit comments, fix all of them, push, wait for re-review, repeat until each PR is clean."
+    domain: engineering
+    timeout: 4h
+  }
+
+  agent pr-scanner {
+    model: haiku
+    permissions: autonomous
+    phase: 1
+    description: "Lists all open PRs in the repo that have unresolved CodeRabbit comments. Outputs the ordered list of PR numbers to process."
+    tools: [Bash]
+    outputs: {
+      status: has-prs | no-prs
+    }
+    prompt {
+      You are a PR scanner. Find every open PR in this repo that has unresolved CodeRabbit comments.
+
+      Steps:
+      1. Get all open PRs:
+           gh pr list --state open --json number,headRefName,title \
+             --jq '.[] | "PR #\(.number) [\(.headRefName)]: \(.title)"'
+
+      2. For each PR number, check if CodeRabbit has left unresolved comments:
+           gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/comments \
+             --jq '[.[] | select(.user.login == "coderabbit[bot]")] | length'
+
+         Get owner/repo with:
+           gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"'
+
+      3. Build the final list — only PRs where CodeRabbit comment count > 0.
+
+      Output format (one PR per line):
+        PR_LIST: <number1> <number2> <number3>
+
+      If no open PRs have CodeRabbit comments, output:
+        status=no-prs
+
+      Otherwise output:
+        status=has-prs
+      followed by PR_LIST on the next line.
+    }
+  }
+
+  agent pr-reader {
+    model: haiku
+    permissions: autonomous
+    phase: 2
+    description: "For each PR in the list, checks out its branch and fetches ALL unresolved CodeRabbit comments across every file. Iterates through all PRs one by one."
+    tools: [Bash, Read]
+    outputs: {
+      status: has-comments | clean
+    }
+    prompt {
+      You receive a list of PR numbers from pr-scanner. Process them one at a time, starting from the first.
+
+      For each PR number:
+
+      1. Check out the PR branch:
+           gh pr checkout <PR_NUMBER>
+
+      2. Fetch ALL CodeRabbit inline comments:
+           gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/comments --paginate \
+             --jq '[.[] | select(.user.login == "coderabbit[bot]") | {id: .id, path: .path, line: .line, body: .body}]'
+
+         Get owner/repo with:
+           gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"'
+
+      3. Fetch CodeRabbit review-level comments:
+           gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/reviews --paginate \
+             --jq '[.[] | select(.user.login == "coderabbit[bot]") | {id: .id, body: .body, state: .state}]'
+
+      4. Print every unresolved comment in this format:
+           PR: <number>
+           BRANCH: <branch name>
+           FILE: <path>
+           LINE: <line number or "general">
+           ISSUE: <full comment body>
+           ---
+
+      If this PR has zero unresolved CodeRabbit comments, skip it and move to the next PR.
+
+      After processing all PRs:
+      - If at least one had comments → output status=has-comments
+      - If all were clean → output status=clean
+    }
+  }
+
+  agent code-fixer {
+    model: sonnet
+    permissions: autonomous
+    phase: 3
+    description: "Reads every CodeRabbit comment from pr-reader and fixes ALL of them. Fully autonomous — no skipping, no asking permission."
+    tools: [Read, Edit, Write, Bash, Grep, Glob]
+    outputs: {
+      status: fixed | nothing-to-fix
+    }
+    prompt {
+      You are an autonomous code fixer. You will receive a structured list of CodeRabbit review comments. Fix every single one — no exceptions, no skipping.
+
+      Rules:
+      - Fix ALL comments. Do not skip any, no matter how minor.
+      - Read the full file before editing — understand the surrounding context.
+      - Make surgical, targeted fixes. Don't rewrite untouched code.
+      - If a comment asks for refactoring, do it properly.
+      - If a comment flags a test gap, add the test.
+      - If a comment points to a logic bug, fix the logic.
+      - If a comment is a nitpick (naming, style, docs), fix it anyway.
+      - Never ask for permission. Never pause. Fix everything autonomously.
+
+      For each comment:
+      1. Read the file at the specified path.
+      2. Find the flagged line.
+      3. Understand what CodeRabbit is requesting.
+      4. Apply the fix exactly.
+      5. Move on to the next comment immediately.
+
+      After all fixes:
+      - Run available tests: try `go test ./...`, `npm test`, `pytest`, or whatever fits the project.
+      - If tests fail due to your changes, fix them too before finishing.
+
+      Output status=fixed with a bullet list of every fix applied.
+      Output status=nothing-to-fix only if no comments were passed in.
+    }
+  }
+
+  agent commit-pusher {
+    model: haiku
+    permissions: autonomous
+    phase: 4
+    description: "Stages all changes, commits with a descriptive message, pushes the branch, and assigns @coderabbit for re-review."
+    tools: [Bash]
+    prompt {
+      You are a git automation agent. Commit and push all fixes, then trigger CodeRabbit for re-review.
+
+      Steps:
+      1. Stage all changes:
+           git add -A
+
+      2. Check if there is anything to commit:
+           git status --porcelain
+         If output is empty, skip to step 4.
+
+      3. Commit:
+           git commit -m "fix: address CodeRabbit review comments
+
+      Auto-fix pass: resolved all open CodeRabbit inline and review comments.
+
+      Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+
+      4. Push:
+           git push
+
+      5. Assign @coderabbit to trigger a new review:
+           gh pr edit --add-assignee "coderabbit"
+         If already assigned, remove then re-add to force a new review cycle:
+           gh pr edit --remove-assignee "coderabbit"
+           gh pr edit --add-assignee "coderabbit"
+
+      6. Print: "Pushed and assigned @coderabbit for re-review."
+    }
+  }
+
+  agent coderabbit-watcher {
+    model: haiku
+    permissions: autonomous
+    phase: 5
+    description: "Polls for a new CodeRabbit review for up to 2 minutes. If none appears, pushes an empty commit to re-trigger. Reports whether the PR is approved, has new comments, or needs another trigger."
+    tools: [Bash]
+    outputs: {
+      verdict: pr-approved | new-comments | triggered-retry
+    }
+    prompt {
+      You are a CodeRabbit review watcher. Wait for CodeRabbit to post a new review, then report the result.
+
+      First, resolve owner/repo and PR number:
+        REPO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"')
+        PR=$(gh pr view --json number --jq '.number')
+
+      Record the ID of the most recent CodeRabbit review before waiting:
+        BEFORE=$(gh api repos/$REPO/pulls/$PR/reviews \
+          --jq '[.[] | select(.user.login == "coderabbit[bot]")] | last | .id // "none"')
+
+      Poll every 15 seconds, up to 8 times (2 minutes total):
+        For each poll:
+          AFTER=$(gh api repos/$REPO/pulls/$PR/reviews \
+            --jq '[.[] | select(.user.login == "coderabbit[bot]")] | last | .id // "none"')
+          If AFTER != BEFORE → new review detected, break loop.
+          Sleep 15 seconds and poll again.
+
+      If no new review after 8 polls (2 minutes):
+        Push an empty commit to force CodeRabbit to re-trigger:
+          git commit --allow-empty -m "chore: trigger CodeRabbit re-review [skip ci]"
+          git push
+        Output verdict=triggered-retry and stop.
+
+      If a new review appeared, determine the outcome:
+        STATE=$(gh api repos/$REPO/pulls/$PR/reviews \
+          --jq '[.[] | select(.user.login == "coderabbit[bot]")] | last | .state')
+
+        COMMENT_COUNT=$(gh api repos/$REPO/pulls/$PR/comments \
+          --jq '[.[] | select(.user.login == "coderabbit[bot]")] | length')
+
+        - STATE == "APPROVED" and COMMENT_COUNT == 0 → verdict=pr-approved
+        - STATE == "APPROVED" and COMMENT_COUNT > 0  → verdict=new-comments
+        - STATE == "CHANGES_REQUESTED"               → verdict=new-comments
+        - STATE == "COMMENTED" and COMMENT_COUNT > 0 → verdict=new-comments
+        - STATE == "COMMENTED" and COMMENT_COUNT == 0 → verdict=pr-approved
+    }
+  }
+
+  action done {
+    kind: report
+    description: "All PRs are clean — no remaining CodeRabbit comments."
+  }
+
+  flow {
+    pr-scanner -> pr-reader          [when pr-scanner.status == has-prs]
+    pr-scanner -> done               [when pr-scanner.status == no-prs]
+
+    pr-reader -> code-fixer          [when pr-reader.status == has-comments]
+    pr-reader -> done                [when pr-reader.status == clean]
+
+    code-fixer -> commit-pusher      [when code-fixer.status == fixed]
+    code-fixer -> done               [when code-fixer.status == nothing-to-fix]
+
+    commit-pusher -> coderabbit-watcher
+
+    coderabbit-watcher -> done          [when coderabbit-watcher.verdict == pr-approved]
+    coderabbit-watcher -> pr-reader     [when coderabbit-watcher.verdict == new-comments, max 10]
+    coderabbit-watcher -> commit-pusher [when coderabbit-watcher.verdict == triggered-retry, max 5]
+  }
+}

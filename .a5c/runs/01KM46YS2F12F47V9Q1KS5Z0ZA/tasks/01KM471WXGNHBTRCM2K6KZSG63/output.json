@@ -1,0 +1,6 @@
+{
+  "success": true,
+  "headSha": "11598e47eac34c5d133dfce899d1e47a2231d7fd",
+  "resolvedFiles": ["frontend/app/page.tsx"],
+  "conflictCount": 2
+}

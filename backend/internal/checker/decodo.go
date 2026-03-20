@@ -66,6 +66,7 @@ func (s *Service) decodoAnalyze(ctx context.Context, url, country, zip string) (
 
 	low := strings.ToLower(html)
 	if strings.ToUpper(country) == "US" && zip != "" {
+		// Amazon uses "free delivery" (EU/UK) and "free shipping" (US) — check both
 		if strings.Contains(low, "free delivery") || strings.Contains(low, "free shipping") {
 			res.FreeShippingCountry = true
 			res.FreeShipping = true
@@ -222,7 +223,7 @@ func extractAlternativesFromMarkdown(markdown, domain string) []Alternative {
 			}
 		}
 
-		freeShip := strings.Contains(item, "FREE Shipping") || strings.Contains(item, "Free Shipping")
+		freeShip := strings.Contains(strings.ToLower(item), "free shipping")
 
 		alts = append(alts, Alternative{
 			ASIN:         asin,

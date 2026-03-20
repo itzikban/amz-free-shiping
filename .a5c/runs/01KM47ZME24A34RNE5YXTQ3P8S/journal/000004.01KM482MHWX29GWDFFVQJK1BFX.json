@@ -1,0 +1,15 @@
+{
+  "type": "EFFECT_REQUESTED",
+  "recordedAt": "2026-03-19T23:49:46.172Z",
+  "data": {
+    "effectId": "01KM482MH6S0Y80B606VM2K7RT",
+    "invocationKey": "fix-fill-images-links:S000002:fix-backend",
+    "invocationHash": "e1b41d02925bdfcc0b8e4bd05f2de65dad281fa99e63139419c3f521ea8e823c",
+    "stepId": "S000002",
+    "taskId": "fix-backend",
+    "kind": "agent",
+    "label": "Fix backend — use correct domain for alt URLs, add image fallback",
+    "taskDefRef": "tasks/01KM482MH6S0Y80B606VM2K7RT/task.json"
+  },
+  "checksum": "218bc867515bbbfb715f45d6a518ce415383d34ea49c67d50cf1117de3d62e89"
+}

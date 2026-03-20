@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "2026.01.results-v1",
+  "effectId": "01KM48EW16QQEX1G8JKYCWF2MD",
+  "taskId": "create-ci-workflow",
+  "invocationKey": "fix-fill-images-links:S000007:create-ci-workflow",
+  "status": "ok",
+  "result": {
+    "created": true,
+    "workflowPath": ".github/workflows/pr-validation.yml"
+  },
+  "startedAt": "2026-03-19T23:56:43.754Z",
+  "finishedAt": "2026-03-19T23:56:43.754Z",
+  "value": {
+    "created": true,
+    "workflowPath": ".github/workflows/pr-validation.yml"
+  }
+}

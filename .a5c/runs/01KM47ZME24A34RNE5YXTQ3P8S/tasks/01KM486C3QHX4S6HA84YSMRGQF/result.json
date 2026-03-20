@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "2026.01.results-v1",
+  "effectId": "01KM486C3QHX4S6HA84YSMRGQF",
+  "taskId": "fix-frontend",
+  "invocationKey": "fix-fill-images-links:S000003:fix-frontend",
+  "status": "ok",
+  "result": {
+    "buildPassed": true,
+    "filesChanged": [
+      "frontend/app/page.tsx"
+    ],
+    "fixed": true
+  },
+  "startedAt": "2026-03-19T23:53:35.429Z",
+  "finishedAt": "2026-03-19T23:53:35.429Z",
+  "value": {
+    "buildPassed": true,
+    "filesChanged": [
+      "frontend/app/page.tsx"
+    ],
+    "fixed": true
+  }
+}

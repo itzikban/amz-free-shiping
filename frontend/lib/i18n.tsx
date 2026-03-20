@@ -32,6 +32,7 @@ const dictionaries = {
     opens_in_new_tab: "(opens in a new tab)",
     fill_to_50_badge: "TOP UP TO $50",
     fill_to_50_missing_prefix: "Missing",
+    fill_to_50_missing_amount: "Missing {amount}",
     fill_to_50_subtitle: "Suggested add-ons to unlock free-shipping threshold",
     fill_to_50_no_realtime_suggestions: "No real-time add-ons found yet for this product.",
     fill_to_50_best_combo: "Best combo:",
@@ -151,6 +152,7 @@ const dictionaries = {
     opens_in_new_tab: "(נפתח בלשונית חדשה)",
     fill_to_50_badge: "השלמה ל־50$",
     fill_to_50_missing_prefix: "חסר",
+    fill_to_50_missing_amount: "חסר {amount}",
     fill_to_50_subtitle: "מוצרים משלימים מומלצים כדי לעבור את סף המשלוח",
     fill_to_50_no_realtime_suggestions: "עדיין לא נמצאו מוצרים משלימים בזמן אמת עבור המוצר הזה.",
     fill_to_50_best_combo: "הקומבו המומלץ:",
@@ -252,6 +254,7 @@ type I18nContextType = {
   dir: "ltr" | "rtl";
   setLang: (lang: Lang) => void;
   t: (key: TranslationKey) => string;
+  tParam: (key: TranslationKey, params: Record<string, string>) => string;
   formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string;
 };
 
@@ -286,6 +289,13 @@ export function I18nProvider({ children, initialLang }: { children: React.ReactN
       dir,
       setLang,
       t: (key: TranslationKey) => dict[key],
+      tParam: (key: TranslationKey, params: Record<string, string>) => {
+        let str: string = dict[key];
+        for (const [placeholder, value] of Object.entries(params)) {
+          str = str.replace(`{${placeholder}}`, value);
+        }
+        return str;
+      },
       formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => {
         const date = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(date.getTime())) return String(value ?? "");

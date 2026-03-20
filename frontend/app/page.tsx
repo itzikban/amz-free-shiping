@@ -12,6 +12,8 @@ type FormState = {
 
 const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
 
+const BROKEN_IMAGE_CLASSES = ["recImage", "recImageBroken"] as const;
+
 /**
  * Interactive homepage that lets users analyze product URLs, view analysis results, and add items to a watchlist.
  *
@@ -21,7 +23,7 @@ const SAMPLE = "https://www.amazon.com/dp/B0DHCZBKW7";
  * @returns The rendered React element for the product analysis home page.
  */
 export default function HomePage() {
-  const { t } = useI18n();
+  const { t, tParam } = useI18n();
   const [form, setForm] = useState<FormState>({ url: SAMPLE, country: "IL", zip: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,25 +67,36 @@ export default function HomePage() {
     setSubmittedForm(null);
     setWatchlistAdded(false);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60_000);
     try {
       const params = new URLSearchParams({ url: submitted.url, country: submitted.country });
       if (submitted.country === "US" && submitted.zip) params.set("zip", submitted.zip);
       if (fetchMethod === "http") params.set("method", "http");
-      const res = await fetch(`/api/check?${params.toString()}`);
+
+      const [res, fillRes] = await Promise.all([
+        fetch(`/api/check?${params.toString()}`, { signal: controller.signal }),
+        fetch(`/api/fill-to-threshold?${params.toString()}&threshold=50`, { signal: controller.signal }),
+      ]);
+
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");
       setResult(body);
 
-      const fillRes = await fetch(`/api/fill-to-threshold?${params.toString()}&threshold=50`);
       if (fillRes.ok) {
-        const fillBody = await fillRes.json();
-        setFillToThresholdResult(fillBody);
+        try {
+          const fillBody = await fillRes.json();
+          setFillToThresholdResult(fillBody);
+        } catch {
+          // Fill-to-threshold body is not valid JSON; ignore and keep main result.
+        }
       }
 
       setSubmittedForm(submitted);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }
@@ -310,7 +323,7 @@ export default function HomePage() {
                   <div style={{ marginTop: 12 }}>
                     <div className="chipRow" style={{ marginBottom: 8 }}>
                       <span className="signalPill neutral">{t("fill_to_50_badge")}</span>
-                      <span className="signalPill ok">{`${t("fill_to_50_missing_prefix")} $${missingToThreshold.toFixed(2)}`}</span>
+                      <span className="signalPill ok">{tParam("fill_to_50_missing_amount", { amount: `$${missingToThreshold.toFixed(2)}` })}</span>
                     </div>
                     <p className="mutedText" style={{ marginTop: 0 }}>{t("fill_to_50_subtitle")}</p>
                     {fillToThresholdSuggestions.length > 0 ? (
@@ -321,14 +334,22 @@ export default function HomePage() {
                           const card = (
                             <>
                               {s.imageUrl ? (
-                                <img src={s.imageUrl} alt={s.title} className="recImage" style={{ objectFit: "cover" }} onError={(e) => {
-                                  const img = e.currentTarget;
-                                  img.style.display = 'none';
-                                  const parent = img.parentElement;
-                                  if (parent && !parent.classList.contains('img-placeholder-2')) {
-                                    parent.classList.add('img-placeholder-2');
-                                  }
-                                }} />
+                                <img
+                                  src={s.imageUrl}
+                                  alt={s.title}
+                                  className="recImage"
+                                  style={{ objectFit: "cover" }}
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    img.style.visibility = "hidden";
+                                    img.style.position = "absolute";
+                                    const sibling = document.createElement("div");
+                                    sibling.classList.add(...BROKEN_IMAGE_CLASSES);
+                                    sibling.innerHTML =
+                                      '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9l4-4 4 4 4-5 4 5"/><circle cx="8.5" cy="13.5" r="1.5"/></svg>';
+                                    img.parentElement?.insertBefore(sibling, img);
+                                  }}
+                                />
                               ) : (
                                 <div className="recImage img-placeholder-2" />
                               )}
@@ -403,62 +424,87 @@ export default function HomePage() {
       {(loading || (result && !result.free_shipping_country)) && (
         <>
           <section className="flowHint animate-flow-3">
-            <span>{t("home_flow_hint")}</span>
+            <span>
+              {loading
+                ? `Finding add-ons near $${thresholdUsd.toFixed(2)}…`
+                : t("home_flow_hint")}
+            </span>
           </section>
 
           <section className="recommendGrid animate-flow-3">
-            {recommendations.map((r) => {
-              const content = (
-                <>
-                  {r.type === "mock" ? (
-                    <div className={`recImage ${r.cls}`} />
-                  ) : (
-                    r.imageUrl ? (
-                      <img src={r.imageUrl} alt={r.title} className="recImage" style={{ objectFit: "cover" }} onError={(e) => {
-                        const img = e.currentTarget;
-                        img.style.display = 'none';
-                        const parent = img.parentElement;
-                        if (parent && !parent.classList.contains('img-placeholder-2')) {
-                          parent.classList.add('img-placeholder-2');
-                        }
-                      }} />
-                    ) : (
-                      <div className="recImage img-placeholder-1" />
-                    )
-                  )}
-                  <h4>{r.type === "mock" ? t(r.titleKey) : r.title}</h4>
-                  <div className="recMeta">
-                    <strong>{r.price}</strong>
-                    <div className="chipRow">
-                      {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
-                      {r.type === "mock" ? (
-                        <span className="signalPill ok">{t(r.tagKey)}</span>
-                      ) : (
-                        r.freeShipping && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              );
-
-              return r.type === "real" && r.url && isValidHttpUrl(r.url) ? (
-                <a
-                  key={r.id}
-                  href={r.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${r.title} ${t("opens_in_new_tab")}`}
-                  className="fluid-card recCard"
-                  style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
-                >
-                  {content}
-                </a>
-              ) : (
-                <article key={r.id} className="fluid-card recCard">
-                  {content}
+            {loading ? (
+              [1, 2, 3].map((n) => (
+                <article key={n} className="fluid-card recCard" aria-busy="true">
+                  <div
+                    className="recImage"
+                    style={{ background: "#e0e0e0", animation: "pulse 1.5s ease-in-out infinite" }}
+                  />
+                  <div style={{ height: 16, borderRadius: 4, background: "#e0e0e0", margin: "8px 0 4px", animation: "pulse 1.5s ease-in-out infinite" }} />
+                  <div style={{ height: 12, borderRadius: 4, background: "#e0e0e0", width: "60%", animation: "pulse 1.5s ease-in-out infinite" }} />
                 </article>
-              );
-            })}
+              ))
+            ) : (
+              recommendations.map((r) => {
+                const content = (
+                  <>
+                    {r.type === "mock" ? (
+                      <div className={`recImage ${r.cls}`} />
+                    ) : (
+                      r.imageUrl ? (
+                        <img
+                          src={r.imageUrl}
+                          alt={r.title}
+                          className="recImage"
+                          style={{ objectFit: "cover" }}
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            img.style.visibility = "hidden";
+                            img.style.position = "absolute";
+                            const sibling = document.createElement("div");
+                            sibling.classList.add(...BROKEN_IMAGE_CLASSES);
+                            sibling.innerHTML =
+                              '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9l4-4 4 4 4-5 4 5"/><circle cx="8.5" cy="13.5" r="1.5"/></svg>';
+                            img.parentElement?.insertBefore(sibling, img);
+                          }}
+                        />
+                      ) : (
+                        <div className="recImage img-placeholder-1" />
+                      )
+                    )}
+                    <h4>{r.type === "mock" ? t(r.titleKey) : r.title}</h4>
+                    <div className="recMeta">
+                      <strong>{r.price}</strong>
+                      <div className="chipRow">
+                        {r.type === "mock" && <span className="signalPill neutral">{t("home_demo_label")}</span>}
+                        {r.type === "mock" ? (
+                          <span className="signalPill ok">{t(r.tagKey)}</span>
+                        ) : (
+                          r.freeShipping && <span className="signalPill ok">{t("rec_tag_free_shipping")}</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+
+                return r.type === "real" && r.url && isValidHttpUrl(r.url) ? (
+                  <a
+                    key={r.id}
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${r.title} ${t("opens_in_new_tab")}`}
+                    className="fluid-card recCard"
+                    style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <article key={r.id} className="fluid-card recCard">
+                    {content}
+                  </article>
+                );
+              })
+            )}
           </section>
         </>
       )}

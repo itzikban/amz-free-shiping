@@ -1,0 +1,15 @@
+{
+  "type": "EFFECT_REQUESTED",
+  "recordedAt": "2026-03-19T23:56:27.068Z",
+  "data": {
+    "effectId": "01KM48EW16QQEX1G8JKYCWF2MD",
+    "invocationKey": "fix-fill-images-links:S000007:create-ci-workflow",
+    "invocationHash": "fe7d4950e3d7125eb57f78731fcc570c67ed9f1c48f2c5b2c0bd8b13b115b5a1",
+    "stepId": "S000007",
+    "taskId": "create-ci-workflow",
+    "kind": "agent",
+    "label": "Create GitHub Actions CI workflow for PR validation",
+    "taskDefRef": "tasks/01KM48EW16QQEX1G8JKYCWF2MD/task.json"
+  },
+  "checksum": "2f4dffe5d24184b1e91dcc040752965d9d5d904672e2dd9ed7872cd35b19e94c"
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "2026.01.tasks-v1",
+  "effectId": "01KM48B5CGYX0DHBH3CK0ACW34",
+  "taskId": "create-tests",
+  "invocationKey": "fix-fill-images-links:S000005:create-tests",
+  "stepId": "S000005",
+  "kind": "agent",
+  "title": "Create E2E and integration tests for fill-to-threshold suggestion cards",
+  "io": {
+    "inputJsonPath": "tasks/01KM48B5CGYX0DHBH3CK0ACW34/input.json",
+    "outputJsonPath": "tasks/01KM48B5CGYX0DHBH3CK0ACW34/result.json"
+  },
+  "inputs": {
+    "diagnosis": {
+      "hardcodedDomainLines": [
+        "checker.go:212: searchURL hardcodes www.amazon.com",
+        "checker.go:344: URL: fmt.Sprintf(\"https://amazon.com/dp/%s\", asin) — missing www., always .com",
+        "checker.go:408: same issue in demo path"
+      ],
+      "imageUrlFieldPopulated": false,
+      "nlUrlCorrect": false,
+      "rootCause": "For NL: enrichWithAlternatives skips alternatives when FreeShippingCountry=true. Also DECODO_BASIC_AUTH absent so decodoFetchAlternatives fails silently. checker.go hardcodes amazon.com (missing www.) for all product URLs. Result: suggestions array empty for NL; even when populated via scraper, URL and image_url fields are wrong/empty.",
+      "urlFieldPopulated": false
+    },
+    "repoDir": "/home/ubuntu/.openclaw/workspace/amz-free-shiping"
+  }
+}

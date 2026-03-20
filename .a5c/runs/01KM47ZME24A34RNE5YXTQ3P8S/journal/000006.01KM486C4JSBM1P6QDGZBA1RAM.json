@@ -1,0 +1,15 @@
+{
+  "type": "EFFECT_REQUESTED",
+  "recordedAt": "2026-03-19T23:51:48.626Z",
+  "data": {
+    "effectId": "01KM486C3QHX4S6HA84YSMRGQF",
+    "invocationKey": "fix-fill-images-links:S000003:fix-frontend",
+    "invocationHash": "389fb56e867fdb9d1810c788165bf3027521500784ca2b7da6759e78ae266268",
+    "stepId": "S000003",
+    "taskId": "fix-frontend",
+    "kind": "agent",
+    "label": "Fix frontend — fallback item URLs and graceful image error handling",
+    "taskDefRef": "tasks/01KM486C3QHX4S6HA84YSMRGQF/task.json"
+  },
+  "checksum": "a76a63a1d13f606e2d1eafc36638c38f3cf26a6806be8285f5279eb64e7f6728"
+}

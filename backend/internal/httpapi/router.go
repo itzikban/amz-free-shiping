@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -19,10 +20,23 @@ import (
 // It registers endpoints for health checks, URL checking, monitoring, user panel (v1/me) and admin actions,
 // and wires the checker, monitor, userpanel, and admin services used by those routes.
 // altCache can be nil, in which case caching is disabled.
+// isNilInterface reports whether an interface value is nil or holds a nil pointer,
+// which handles the case where a typed nil (e.g. (*altcache.Cache)(nil)) is passed
+// as a checker.AltCache interface — the interface itself is non-nil in that case.
+func isNilInterface(v checker.AltCache) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Ptr && rv.IsNil()
+}
+
 func NewRouter(altCache checker.AltCache) http.Handler {
 	mux := http.NewServeMux()
 	svc := checker.New()
-	svc.AltCache = altCache
+	if !isNilInterface(altCache) {
+		svc.AltCache = altCache
+	}
 	msvc := monitor.New(svc)
 	usvc := userpanel.New(svc)
 	asvc := admin.NewService(msvc, usvc)

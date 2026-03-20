@@ -2,13 +2,13 @@ package altcache
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
@@ -107,7 +107,7 @@ func (c *Cache) Get(ctx context.Context, asin string) ([]checker.Alternative, bo
 				atomic.AddInt64(&c.Metrics.L3Hits, 1)
 				return alts, true
 			}
-		} else if err != sql.ErrNoRows {
+		} else if err != pgx.ErrNoRows {
 			log.Printf("[altcache] db read failed for %s: %v", asin, err)
 		}
 	}

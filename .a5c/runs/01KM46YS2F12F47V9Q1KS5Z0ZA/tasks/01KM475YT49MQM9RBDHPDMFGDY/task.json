@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2026.01.tasks-v1",
+  "effectId": "01KM475YT49MQM9RBDHPDMFGDY",
+  "taskId": "validate-build",
+  "invocationKey": "branch-merge-align:S000003:validate-build",
+  "stepId": "S000003",
+  "kind": "agent",
+  "title": "Validate frontend build and backend tests",
+  "io": {
+    "inputJsonPath": "tasks/01KM475YT49MQM9RBDHPDMFGDY/input.json",
+    "outputJsonPath": "tasks/01KM475YT49MQM9RBDHPDMFGDY/result.json"
+  },
+  "inputs": {
+    "mergeResult": {
+      "conflictCount": 2,
+      "headSha": "11598e47eac34c5d133dfce899d1e47a2231d7fd",
+      "resolvedFiles": [
+        "frontend/app/page.tsx"
+      ],
+      "success": true
+    },
+    "repoDir": "/home/ubuntu/.openclaw/workspace/amz-free-shiping"
+  }
+}
