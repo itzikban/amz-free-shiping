@@ -288,7 +288,7 @@ func fetchShippingInfo(p *ScrapedProduct) error {
 				return true
 			}
 			if strings.Contains(text, "free shipping") || strings.Contains(text, "ships free") ||
-				(strings.Contains(text, "prime") && (strings.Contains(text, "delivery") || strings.Contains(text, "shipping"))) {
+				strings.Contains(text, "free delivery") {
 				p.FreeShipUS = true
 				p.ShippingInfo = "Free shipping"
 				foundSignal = true

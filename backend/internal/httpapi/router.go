@@ -3,6 +3,7 @@ package httpapi
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"math"
 	"net/http"
 	"os"
 	"reflect"
@@ -86,7 +87,7 @@ func NewRouter(altCache checker.AltCache) http.Handler {
 		threshold := 50.0
 		if raw := strings.TrimSpace(r.URL.Query().Get("threshold")); raw != "" {
 			v, err := strconv.ParseFloat(raw, 64)
-			if err != nil || v <= 0 {
+			if err != nil || v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "threshold must be a positive number"})
 				return
 			}

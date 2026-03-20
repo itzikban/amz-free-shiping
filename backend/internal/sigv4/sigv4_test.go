@@ -15,12 +15,10 @@ func TestSHA256Hash(t *testing.T) {
 	}
 
 	got2 := sigv4.SHA256Hash([]byte("hello world"))
-	const want2 = "b94d27b9934d3e08a52e52d7da7dabfac484efe04294e576f4e2240c61b18061"
-	// Confirm non-empty result is distinct
-	if got2 == got {
-		t.Error("SHA256Hash(\"hello world\") should differ from SHA256Hash(\"\")")
+	const want2 = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+	if got2 != want2 {
+		t.Errorf("SHA256Hash(\"hello world\") = %q, want %q", got2, want2)
 	}
-	_ = want2
 }
 
 func TestHMACSHA256(t *testing.T) {

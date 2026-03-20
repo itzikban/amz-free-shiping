@@ -124,7 +124,7 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 	case "decodo":
 		log.Printf("[DEBUG] Using Decodo markdown to fetch alternatives for ASIN: %s", asin)
 		domain := "www.amazon.com"
-		if u, parseErr := url.Parse(res.URL); parseErr == nil && u.Host != "" {
+		if u, parseErr := url.Parse(res.URL); parseErr == nil && isKnownAmazonHost(u.Host) {
 			domain = u.Host
 		}
 		alts, err = s.decodoFetchAlternatives(ctx, asin, domain)
@@ -161,6 +161,37 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 	}
 	// Silently ignore PA-API/scraper errors — it's a bonus feature
 	return res, nil
+}
+
+// knownAmazonHosts is the set of recognized Amazon marketplace hostnames.
+var knownAmazonHosts = map[string]bool{
+	"www.amazon.com":    true,
+	"www.amazon.co.uk":  true,
+	"www.amazon.de":     true,
+	"www.amazon.fr":     true,
+	"www.amazon.nl":     true,
+	"www.amazon.co.jp":  true,
+	"www.amazon.ca":     true,
+	"www.amazon.com.au": true,
+	"www.amazon.it":     true,
+	"www.amazon.es":     true,
+	"www.amazon.in":     true,
+	"www.amazon.com.br": true,
+	"www.amazon.com.mx": true,
+	"www.amazon.sg":     true,
+	"www.amazon.ae":     true,
+	"www.amazon.sa":     true,
+	"www.amazon.pl":     true,
+	"www.amazon.se":     true,
+	"www.amazon.tr":     true,
+	"amazon.com":        true,
+	"amazon.co.uk":      true,
+	"amazon.de":         true,
+}
+
+// isKnownAmazonHost returns true if host is a recognized Amazon marketplace hostname.
+func isKnownAmazonHost(host string) bool {
+	return knownAmazonHosts[strings.ToLower(host)]
 }
 
 // extractASINFromURL extracts ASIN from various Amazon URL formats
@@ -596,11 +627,11 @@ func AnalyzeHTML(url, country, html string) Result {
 
 	countryPatterns := map[string][]string{
 		"IL": {"free shipping to israel", "eligible for free shipping to israel", "free delivery to israel"},
-		"US": {"free shipping to united states", "free shipping to the united states", "free delivery to united states", "ships to united states"},
-		"DE": {"kostenlose lieferung", "gratis lieferung", "versandkostenfrei", "lieferung nach deutschland"},
-		"GB": {"free delivery to the uk", "free shipping to the uk", "delivery to united kingdom"},
-		"NL": {"gratis verzending", "kosteloze levering", "levering naar nederland"},
-		"FR": {"livraison gratuite", "expédition gratuite", "livraison en france"},
+		"US": {"free shipping to united states", "free shipping to the united states", "free delivery to united states"},
+		"DE": {"kostenlose lieferung", "gratis lieferung", "versandkostenfrei", "kostenfreie lieferung"},
+		"GB": {"free delivery to the uk", "free shipping to the uk"},
+		"NL": {"gratis verzending", "kosteloze levering"},
+		"FR": {"livraison gratuite", "expédition gratuite"},
 	}
 	freeGeneralPatterns := []string{
 		"free shipping",
@@ -657,7 +688,7 @@ func AnalyzeHTML(url, country, html string) Result {
 	// Small DOM fallback for common selectors.
 	if docErr == nil {
 		txt := strings.ToLower(strings.TrimSpace(doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE").Text()))
-		if strings.Contains(txt, "free") || strings.Contains(txt, "kosten") || strings.Contains(txt, "gratis") || strings.Contains(txt, "livraison") {
+		if strings.Contains(txt, "free") || strings.Contains(txt, "kostenlos") || strings.Contains(txt, "kostenfreie") || strings.Contains(txt, "gratis") || strings.Contains(txt, "livraison gratuite") {
 			if country == "IL" && strings.Contains(txt, "israel") {
 				res.FreeShippingCountry = true
 				res.FreeShipping = true

@@ -74,23 +74,27 @@ export default function HomePage() {
       if (submitted.country === "US" && submitted.zip) params.set("zip", submitted.zip);
       if (fetchMethod === "http") params.set("method", "http");
 
-      const [res, fillRes] = await Promise.all([
-        fetch(`/api/check?${params.toString()}`, { signal: controller.signal }),
-        fetch(`/api/fill-to-threshold?${params.toString()}&threshold=50`, { signal: controller.signal }),
-      ]);
+      const res = await fetch(`/api/check?${params.toString()}`, { signal: controller.signal });
 
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "Request failed");
       setResult(body);
 
-      if (fillRes.ok) {
-        try {
-          const fillBody = await fillRes.json();
-          setFillToThresholdResult(fillBody);
-        } catch {
-          // Fill-to-threshold body is not valid JSON; ignore and keep main result.
-        }
-      }
+      // Kick off fill-to-threshold as a non-fatal background request
+      fetch(`/api/fill-to-threshold?${params.toString()}&threshold=50`, { signal: controller.signal })
+        .then(async (fillRes) => {
+          if (fillRes.ok) {
+            try {
+              const fillBody = await fillRes.json();
+              setFillToThresholdResult(fillBody);
+            } catch {
+              // Fill-to-threshold body is not valid JSON; ignore and keep main result.
+            }
+          }
+        })
+        .catch(() => {
+          // Fill-to-threshold network error is non-fatal; main result already set.
+        });
 
       setSubmittedForm(submitted);
     } catch (err) {
@@ -426,7 +430,7 @@ export default function HomePage() {
           <section className="flowHint animate-flow-3">
             <span>
               {loading
-                ? `Finding add-ons near $${thresholdUsd.toFixed(2)}…`
+                ? tParam("loading_find_addons_near", { amount: thresholdUsd.toFixed(2) })
                 : t("home_flow_hint")}
             </span>
           </section>
