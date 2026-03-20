@@ -262,6 +262,19 @@ export default function HomePage() {
             </div>
           )}
 
+          <div className="search-row fixed">
+            <label className="sr-only" htmlFor="fetch-method">{t("method_label")}</label>
+            <select
+              id="fetch-method"
+              className="clean-input"
+              value={fetchMethod}
+              onChange={(e) => setFetchMethod(e.target.value as "auto" | "http")}
+            >
+              <option value="auto">{t("method_auto")}</option>
+              <option value="http">{t("method_http")}</option>
+            </select>
+          </div>
+
           <button className="analyzeBtn" disabled={!canSubmit || loading}>
             {loading ? t("loading") : t("home_analyze")}
           </button>
