@@ -44,6 +44,8 @@ func (s *Service) GoScrapeAlternatives(ctx context.Context, query string) ([]Alt
 }
 
 func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) ([]Alternative, error) {
+	// Trim query to first 5 words — long product titles hurt Amazon search relevance.
+	searchQuery = trimToWords(searchQuery, 5)
 	baseURL := "https://www.amazon.com/s?k=" + url.QueryEscape(searchQuery) + "&ref=nb_sb_noss"
 
 	type pageResult struct {
@@ -68,7 +70,9 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 				pageURL = fmt.Sprintf("%s&page=%d", baseURL, p)
 			}
 
-			reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			// Use a fresh context so a near-expired parent (after Decodo+scraper retries)
+			// doesn't immediately cancel our request.
+			reqCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
 			req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, pageURL, nil)
@@ -257,6 +261,15 @@ func parseSearchResult(sel *goquery.Selection) Alternative {
 	}
 
 	return alt
+}
+
+// trimToWords returns the first n whitespace-separated words of s.
+func trimToWords(s string, n int) string {
+	words := strings.Fields(s)
+	if len(words) <= n {
+		return s
+	}
+	return strings.Join(words[:n], " ")
 }
 
 func parsePrice(s string) float64 {
