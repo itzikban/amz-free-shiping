@@ -31,6 +31,15 @@ func (s *Service) BuildFillToThresholdForURL(ctx context.Context, productURL, co
 		}
 	}
 
+	// Try goScrape direct scraper before falling back to the proxy-based scraper.
+	if len(alts) == 0 && res.Title != "" {
+		if goAlts, gerr := s.goScrapeAlternatives(ctx, res.Title); gerr == nil && len(goAlts) > 0 {
+			alts = goAlts
+		} else if gerr != nil {
+			log.Printf("[DEBUG] goscrape fallback failed for %q: %v", res.Title, gerr)
+		}
+	}
+
 	// If still no alternatives (e.g. FreeShippingCountry=true skipped enrichWithAlternatives,
 	// or Decodo returned nothing), fall back to the Amazon scraper using the product title.
 	if len(alts) == 0 && res.Title != "" {

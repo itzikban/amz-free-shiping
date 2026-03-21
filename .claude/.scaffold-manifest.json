@@ -1,35 +1,43 @@
 {
-  "source": "perf-ux-improvements.at",
-  "sourceHash": "94e876fcd22d43985aa07b85b161c5bdda1c84668fdc09f3da3cb940b3a3dac0",
+  "source": "goscraper-impl.at",
+  "sourceHash": "f6463a72b6fb0c006fe6a0ad63aa7ec6392e41ba6adb0f48aa0abe31354c90bb",
   "target": "claude-code",
-  "generatedAt": "2026-03-20T23:39:05.931Z",
+  "generatedAt": "2026-03-21T00:18:21.398Z",
   "files": {
-    ".claude/agents/coordinator/AGENT.md": {
-      "hash": "a36aba7b7135dbbfb5bcfd61e234676e8506ed94b9f24a9175ea2c45ce5dc418",
+    ".claude/skills/goscraper-impl/scripts/action-done.sh": {
+      "hash": "618a6c637964292112d8c643f35306c7baee9bd7e3c3bf89214e15007156859a",
+      "category": "script"
+    },
+    ".claude/agents/branch-creator/AGENT.md": {
+      "hash": "acfa153512e53ca571b95429f68035376cb8af0b2d0f8be09e3eb4454f70c138",
       "category": "agent"
     },
-    ".claude/agents/frontend-engineer/AGENT.md": {
-      "hash": "b7b0bcc2dd955ec7862999422d966eed2e264f5731787a309abeabc46284e1ab",
+    ".claude/agents/goscraper-implementer/AGENT.md": {
+      "hash": "98ea2b7485f9e629a0184aa0b3e5158ad07780c9ebf49ee5d5b02b7a400f32a3",
       "category": "agent"
     },
-    ".claude/agents/backend-engineer/AGENT.md": {
-      "hash": "16585fa3ed321495008cda906b8c4f5b138910f7aa32fa34457b48f8e95aaec8",
+    ".claude/agents/scraper-validator/AGENT.md": {
+      "hash": "b08b4e1a84ed35a942a3c6e5aefe1e10d855d1cfb7826cd8cdf37997786d8ee1",
       "category": "agent"
     },
-    ".claude/agents/qa-reviewer/AGENT.md": {
-      "hash": "350b95287a164a0501782eee10edd1b3dfebd88a609834bc2d2e9882ce9f3871",
+    ".claude/agents/builder-tester/AGENT.md": {
+      "hash": "b5c4cba373db529189b4455693b32fc79e1dea7ec935058b4ec09d22a9c855a1",
       "category": "agent"
     },
-    ".claude/agents/reporter/AGENT.md": {
-      "hash": "d6443615ee954b937af9e1fdcac383b75af1e7bc347a000985c315b76e32396e",
+    ".claude/agents/goscraper-fixer/AGENT.md": {
+      "hash": "0b85de5d6b8826cb80ddc9c2360a5de1dd4c3620d4925d7b1e78240606d22239",
       "category": "agent"
     },
-    ".claude/skills/perf-ux-improvements/SKILL.md": {
-      "hash": "3d8f8bbf1ac333d611191f4d79c091bea20fe41c4c988e9986e74a78b2e604f4",
+    ".claude/agents/goscraper-commit-pusher/AGENT.md": {
+      "hash": "d9941c22f0e0a1bb41f419e8f13800b8a59c090a1b5be8fee1c9cb10ccf50611",
+      "category": "agent"
+    },
+    ".claude/skills/goscraper-impl/SKILL.md": {
+      "hash": "6831ac672372d695590ab8450af92dd3629f4dd042155f757cdccfb8bb05617e",
       "category": "agent"
     },
     ".claude/CONTEXT.md": {
-      "hash": "62676f82ae9e6c4ec7796799a0b1b644d9126e18bb92701e546caf46dd3424ac",
+      "hash": "c3e8e89128a8fc3bae9a778286bec9f5b6bc21ebe705bf87a8b2fca9aea7ebc5",
       "category": "machine"
     }
   }

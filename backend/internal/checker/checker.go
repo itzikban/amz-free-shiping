@@ -148,6 +148,14 @@ func (s *Service) enrichWithAlternatives(ctx context.Context, res Result) (Resul
 		} else {
 			log.Printf("[DEBUG] PA-API: found %d alternatives", len(alts))
 		}
+	case "goscrape":
+		log.Printf("[DEBUG] Using goScrape to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
+		alts, err = s.goScrapeAlternatives(ctx, res.Title)
+		if err != nil {
+			log.Printf("[DEBUG] goScrape: search failed: %v", err)
+		} else {
+			log.Printf("[DEBUG] goScrape: found %d alternatives", len(alts))
+		}
 	default:
 		log.Printf("[DEBUG] Unknown ALT_FETCH_METHOD=%s, falling back to scraper", altFetchMethod)
 		doScrape("Falling back to")

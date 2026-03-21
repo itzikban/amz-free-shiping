@@ -1,7 +1,7 @@
-# Perf Ux Improvements
+# Goscraper Impl
 
-Parallel performance and UX fix agents for the amz-free-shipping app — engineers consult each other when needed, QA routes fixes back to the right engineer.
+Autonomously implements goscrape (direct Amazon scraper, no PA-API), validates with a live scrape test, builds, tests, and pushes to feat/goscraper-integration. Opus writes and fixes code. Loop until green.
 
-Version: 2.0.0
-Patterns: fan-out
+Version: 1.0.0
+Patterns: pipeline
 
