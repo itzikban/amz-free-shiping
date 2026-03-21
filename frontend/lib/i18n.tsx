@@ -16,18 +16,30 @@ const dictionaries = {
     home_url_placeholder: "Paste Amazon URL here...",
     home_country_il: "Israel (IL)",
     home_country_us: "United States (US)",
+    home_country_nl: "🇳🇱 Netherlands (NL)",
     home_zip_placeholder: "ZIP",
     home_analyze: "Analyze",
     home_target_analysis: "Target Analysis",
-    home_alert_cta_disabled: "Alert feature coming soon",
+    home_alert_cta_disabled: "Price drop alerts — coming soon",
     home_coming_soon_short: "Coming soon",
     home_flow_hint: "While you wait, we found alternatives with free shipping",
+    loading_find_addons_near: "Finding add-ons near ${amount}…",
     home_demo_label: "Demo",
     rec_title_1: "Sony WH-1000XM5 (International Version)",
     rec_title_2: "Sony WH-1000XM5 Wireless - Silver",
     rec_title_3: "Bose QuietComfort Ultra - Black",
     rec_tag_free_shipping: "FREE SHIPPING",
     rec_tag_best_match: "BEST MATCH",
+    opens_in_new_tab: "(opens in a new tab)",
+    fill_to_50_badge: "TOP UP TO $50",
+    fill_to_50_missing_prefix: "Missing",
+    fill_to_50_missing_amount: "Missing {amount}",
+    fill_to_50_subtitle: "Suggested add-ons to unlock free-shipping threshold",
+    fill_to_50_no_realtime_suggestions: "No real-time add-ons found yet for this product.",
+    fill_to_50_best_combo: "Best combo:",
+    fill_to_50_item_1: "Cable organizer",
+    fill_to_50_item_2: "Travel adapter",
+    fill_to_50_item_3: "Storage pouch",
     check_button: "Check free shipping",
     add_button: "Add product to watchlist",
     watchlist_added: "Added",
@@ -82,6 +94,8 @@ const dictionaries = {
     price_label: "Price (USD)",
     signal_label: "Signal",
     method_label: "Method",
+    method_auto: "Auto",
+    method_http: "HTTP",
     view_all: "View all",
     empty_watchlist: "No tracked products yet.",
     empty_alerts: "No alerts yet.",
@@ -123,18 +137,30 @@ const dictionaries = {
     home_url_placeholder: "הדביקו כאן קישור אמזון...",
     home_country_il: "ישראל (IL)",
     home_country_us: "ארצות הברית (US)",
+    home_country_nl: "🇳🇱 הולנד (NL)",
     home_zip_placeholder: "מיקוד",
     home_analyze: "נתח",
     home_target_analysis: "ניתוח יעד",
     home_alert_cta_disabled: "תכונת התראות תתווסף בקרוב",
     home_coming_soon_short: "בקרוב",
     home_flow_hint: "בזמן ההמתנה, מצאנו חלופות עם משלוח חינם",
+    loading_find_addons_near: "מחפשים תוספות ליד ${amount}…",
     home_demo_label: "דמו",
     rec_title_1: "Sony WH-1000XM5 (גרסה בינלאומית)",
     rec_title_2: "Sony WH-1000XM5 אלחוטי - כסף",
     rec_title_3: "Bose QuietComfort Ultra - שחור",
     rec_tag_free_shipping: "משלוח חינם",
     rec_tag_best_match: "ההתאמה הטובה ביותר",
+    opens_in_new_tab: "(נפתח בלשונית חדשה)",
+    fill_to_50_badge: "השלמה ל־50$",
+    fill_to_50_missing_prefix: "חסר",
+    fill_to_50_missing_amount: "חסר {amount}",
+    fill_to_50_subtitle: "מוצרים משלימים מומלצים כדי לעבור את סף המשלוח",
+    fill_to_50_no_realtime_suggestions: "עדיין לא נמצאו מוצרים משלימים בזמן אמת עבור המוצר הזה.",
+    fill_to_50_best_combo: "הקומבו המומלץ:",
+    fill_to_50_item_1: "מארגן כבלים",
+    fill_to_50_item_2: "מתאם נסיעות",
+    fill_to_50_item_3: "נרתיק אחסון",
     check_button: "בדוק משלוח חינם",
     add_button: "הוסף למעקב",
     watchlist_added: "נוסף",
@@ -189,6 +215,8 @@ const dictionaries = {
     price_label: "מחיר (USD)",
     signal_label: "איתות",
     method_label: "שיטה",
+    method_auto: "אוטומטי",
+    method_http: "HTTP",
     view_all: "צפה בהכל",
     empty_watchlist: "עדיין אין מוצרים במעקב.",
     empty_alerts: "עדיין אין התראות.",
@@ -228,6 +256,7 @@ type I18nContextType = {
   dir: "ltr" | "rtl";
   setLang: (lang: Lang) => void;
   t: (key: TranslationKey) => string;
+  tParam: (key: TranslationKey, params: Record<string, string>) => string;
   formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string;
 };
 
@@ -262,6 +291,13 @@ export function I18nProvider({ children, initialLang }: { children: React.ReactN
       dir,
       setLang,
       t: (key: TranslationKey) => dict[key],
+      tParam: (key: TranslationKey, params: Record<string, string>) => {
+        let str: string = dict[key];
+        for (const [placeholder, value] of Object.entries(params)) {
+          str = str.replace(`{${placeholder}}`, value);
+        }
+        return str;
+      },
       formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => {
         const date = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(date.getTime())) return String(value ?? "");

@@ -386,6 +386,7 @@ h4 { margin: 0 0 8px; }
 .img-placeholder-2 { background: linear-gradient(135deg, #1a2a6c, #112240); }
 .img-placeholder-3 { background: linear-gradient(135deg, #3a1c71, #150824); }
 .img-placeholder-main { background: linear-gradient(135deg, #434343, #000000); }
+.recImageBroken { background: #f0f0f0; display: flex; align-items: center; justify-content: center; }
 img.targetImage { object-fit: contain; border-radius: 12px; background: #fff; }
 .watchlistThumb { width: 60px; height: 60px; object-fit: contain; border-radius: 8px; background: #fff; flex-shrink: 0; }
 .watchlistTitle { display: block; margin-bottom: 4px; font-size: 0.95rem; line-height: 1.3; overflow-wrap: anywhere; }

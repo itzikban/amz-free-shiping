@@ -1,0 +1,36 @@
+{
+  "source": "perf-ux-improvements.at",
+  "sourceHash": "94e876fcd22d43985aa07b85b161c5bdda1c84668fdc09f3da3cb940b3a3dac0",
+  "target": "claude-code",
+  "generatedAt": "2026-03-20T23:39:05.931Z",
+  "files": {
+    ".claude/agents/coordinator/AGENT.md": {
+      "hash": "a36aba7b7135dbbfb5bcfd61e234676e8506ed94b9f24a9175ea2c45ce5dc418",
+      "category": "agent"
+    },
+    ".claude/agents/frontend-engineer/AGENT.md": {
+      "hash": "b7b0bcc2dd955ec7862999422d966eed2e264f5731787a309abeabc46284e1ab",
+      "category": "agent"
+    },
+    ".claude/agents/backend-engineer/AGENT.md": {
+      "hash": "16585fa3ed321495008cda906b8c4f5b138910f7aa32fa34457b48f8e95aaec8",
+      "category": "agent"
+    },
+    ".claude/agents/qa-reviewer/AGENT.md": {
+      "hash": "350b95287a164a0501782eee10edd1b3dfebd88a609834bc2d2e9882ce9f3871",
+      "category": "agent"
+    },
+    ".claude/agents/reporter/AGENT.md": {
+      "hash": "d6443615ee954b937af9e1fdcac383b75af1e7bc347a000985c315b76e32396e",
+      "category": "agent"
+    },
+    ".claude/skills/perf-ux-improvements/SKILL.md": {
+      "hash": "3d8f8bbf1ac333d611191f4d79c091bea20fe41c4c988e9986e74a78b2e604f4",
+      "category": "agent"
+    },
+    ".claude/CONTEXT.md": {
+      "hash": "62676f82ae9e6c4ec7796799a0b1b644d9126e18bb92701e546caf46dd3424ac",
+      "category": "machine"
+    }
+  }
+}

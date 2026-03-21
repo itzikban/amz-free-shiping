@@ -3,11 +3,15 @@ package httpapi
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"math"
 	"net/http"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 
 	"free-ship-checker-go/internal/admin"
+	"free-ship-checker-go/internal/altcache"
 	"free-ship-checker-go/internal/checker"
 	"free-ship-checker-go/internal/monitor"
 	"free-ship-checker-go/internal/userpanel"
@@ -16,9 +20,24 @@ import (
 // NewRouter constructs and returns an http.Handler that serves the application's HTTP API.
 // It registers endpoints for health checks, URL checking, monitoring, user panel (v1/me) and admin actions,
 // and wires the checker, monitor, userpanel, and admin services used by those routes.
-func NewRouter() http.Handler {
+// altCache can be nil, in which case caching is disabled.
+// isNilInterface reports whether an interface value is nil or holds a nil pointer,
+// which handles the case where a typed nil (e.g. (*altcache.Cache)(nil)) is passed
+// as a checker.AltCache interface — the interface itself is non-nil in that case.
+func isNilInterface(v checker.AltCache) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Ptr && rv.IsNil()
+}
+
+func NewRouter(altCache checker.AltCache) http.Handler {
 	mux := http.NewServeMux()
 	svc := checker.New()
+	if !isNilInterface(altCache) {
+		svc.AltCache = altCache
+	}
 	msvc := monitor.New(svc)
 	usvc := userpanel.New(svc)
 	asvc := admin.NewService(msvc, usvc)
@@ -50,6 +69,38 @@ func NewRouter() http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
+	})
+
+	mux.HandleFunc("/api/v1/fill-to-threshold", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing url query param"})
+			return
+		}
+		country := r.URL.Query().Get("country")
+		zip := r.URL.Query().Get("zip")
+		threshold := 50.0
+		if raw := strings.TrimSpace(r.URL.Query().Get("threshold")); raw != "" {
+			v, err := strconv.ParseFloat(raw, 64)
+			if err != nil || v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "threshold must be a positive number"})
+				return
+			}
+			threshold = v
+		}
+
+		payload, err := svc.BuildFillToThresholdForURL(r.Context(), url, country, zip, threshold, r.URL.Query().Get("method"))
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, payload)
 	})
 
 	mux.HandleFunc("/monitor/start", func(w http.ResponseWriter, r *http.Request) {
@@ -305,6 +356,20 @@ func NewRouter() http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "action": "retry_failed_notifications", "processed": processed})
 	})
+
+	// Alternative cache metrics endpoint
+	if snapper, ok := any(altCache).(altcache.Snapshotter); ok {
+		mux.HandleFunc("/v1/admin/altcache/metrics", func(w http.ResponseWriter, r *http.Request) {
+			if !requireAdmin(r, w) {
+				return
+			}
+			if r.Method != http.MethodGet {
+				methodNotAllowed(w, http.MethodGet)
+				return
+			}
+			writeJSON(w, http.StatusOK, snapper.Snapshot())
+		})
+	}
 
 	return mux
 }

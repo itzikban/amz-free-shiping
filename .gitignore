@@ -5,6 +5,14 @@ frontend/.env
 
 .run/
 .logs/
+
+.env
+backend/server
+
 .agent/
 .previews/
 Focus.md
+
+.a5c/
+frontend/.a5c/
+.coderabbit-cache/

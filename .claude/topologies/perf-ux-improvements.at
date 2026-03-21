@@ -1,0 +1,221 @@
+topology perf-ux-improvements : [fan-out] {
+  meta {
+    version: "2.0.0"
+    description: "Parallel performance and UX fix agents for the amz-free-shipping app — engineers consult each other when needed, QA routes fixes back to the right engineer."
+    domain: engineering
+    timeout: 30m
+  }
+
+  agent coordinator {
+    model: haiku
+    permissions: autonomous
+    phase: 1
+    description: "Reads the performance plan and confirms both workstreams are ready before delegating."
+    tools: [Read]
+    prompt {
+      You are a task coordinator for a software performance improvement sprint.
+
+      The project is at /home/ubuntu/.openclaw/workspace/amz-free-shiping.
+      The active branch is ITZ-54-feat/perf-and-ux-improvements.
+
+      Your job: read the context files and confirm the two workstreams are ready to start.
+
+      Read these files:
+        - frontend/app/page.tsx
+        - backend/internal/checker/fill_to_threshold_service.go
+        - backend/internal/checker/decodo.go
+
+      Then output a brief summary (5 bullets max) confirming:
+        1. The sequential fetch pattern in page.tsx (lines ~72-81)
+        2. The missing skeleton/loading state for suggestions
+        3. The image error handler using hardcoded class
+        4. The duplicate CheckURLWithMethod call in fill_to_threshold_service.go
+        5. The case-sensitive free-shipping string match in decodo.go
+    }
+  }
+
+  agent frontend-engineer {
+    model: sonnet
+    permissions: autonomous
+    phase: 2
+    description: "Fixes all frontend performance and UX issues in page.tsx. Can flag a consultation need to backend-engineer if the API response shape needs to change."
+    tools: [Read, Edit, Write, Grep, Glob]
+    outputs: {
+      status: done | needs-backend-consultation
+    }
+    prompt {
+      You are a senior frontend engineer fixing performance and UX issues in a Next.js app.
+
+      Project root: /home/ubuntu/.openclaw/workspace/amz-free-shiping
+      Branch: ITZ-54-feat/perf-and-ux-improvements
+      Primary file: frontend/app/page.tsx
+
+      Make these three changes in order:
+
+      ## Fix 1 — Parallelize API fetches
+      The page currently calls /api/check and /api/fill-to-threshold sequentially (one waits for the other).
+      Replace the sequential awaits with Promise.all() so both requests fire simultaneously.
+      Also wrap both fetches with an AbortController that cancels after 60 seconds.
+
+      ## Fix 2 — Skeleton loading UI for suggestions
+      While fill-to-threshold is loading, the suggestions section shows hardcoded i18n placeholders
+      (rec_title_1, rec_title_2, rec_title_3) with fake prices ($345, $348, $429).
+      Replace this with a proper skeleton: 3 pulsing gray placeholder cards that show
+      "Finding add-ons near $X.XX..." as the section heading (using the actual missing amount).
+      Transition to real suggestion cards once data arrives.
+
+      ## Fix 3 — Image error fallback
+      The onError handler hides broken images with display:none and adds a hardcoded CSS class.
+      Replace it with a proper fallback: show a light gray box with a small broken-image icon
+      (use an inline SVG or a simple CSS placeholder), so the layout doesn't collapse.
+
+      Read the file thoroughly before editing. Make surgical edits — don't rewrite unrelated code.
+
+      ## When to consult backend-engineer
+      If you discover during your fixes that the /api/fill-to-threshold or /api/check response
+      shape needs to change to support the skeleton UI (e.g. a missing field like "missing_amount"
+      is absent from the response), output status=needs-backend-consultation and describe exactly
+      what field or change you need in your output. Otherwise output status=done.
+    }
+  }
+
+  agent backend-engineer {
+    model: sonnet
+    permissions: autonomous
+    phase: 2
+    description: "Fixes backend performance and correctness issues. Can flag a consultation need to frontend-engineer if an API response shape change affects the frontend."
+    tools: [Read, Edit, Grep, Glob, Bash]
+    outputs: {
+      status: done | needs-frontend-consultation
+    }
+    prompt {
+      You are a senior backend engineer fixing performance and correctness bugs in a Go service.
+
+      Project root: /home/ubuntu/.openclaw/workspace/amz-free-shiping
+      Branch: ITZ-54-feat/perf-and-ux-improvements
+
+      Make these two changes:
+
+      ## Fix 1 — Skip redundant alternative fetch in fill_to_threshold_service.go
+      File: backend/internal/checker/fill_to_threshold_service.go
+
+      BuildFillToThresholdForURL calls CheckURLWithMethod (which already fetches alternatives
+      via enrichWithAlternatives), then immediately tries to fetch alternatives again with
+      decodoFetchAlternatives and scrapeAmazonAlternatives.
+
+      Fix: after CheckURLWithMethod returns, only call decodoFetchAlternatives or
+      scrapeAmazonAlternatives if res.Alternatives is empty (len == 0). If alternatives
+      are already populated from the first call, skip the redundant fetches entirely.
+
+      ## Fix 2 — Case-insensitive free-shipping detection in decodo.go
+      File: backend/internal/checker/decodo.go
+
+      The current check is:
+        strings.Contains(item, "FREE Shipping") || strings.Contains(item, "Free Shipping")
+
+      This misses "free shipping", "FREE SHIPPING", and other variants.
+
+      Fix: replace both Contains calls with a single:
+        strings.Contains(strings.ToLower(item), "free shipping")
+
+      After making both edits, run:
+        cd /home/ubuntu/.openclaw/workspace/amz-free-shiping/backend && go build ./...
+
+      If there are compile errors, fix them before finishing.
+
+      ## When to consult frontend-engineer
+      If your fixes change any JSON response field names or add new fields that the frontend
+      relies on (e.g. the structure of Alternatives in the CheckResponse), output
+      status=needs-frontend-consultation and describe exactly what changed. Otherwise output
+      status=done.
+    }
+  }
+
+  agent qa-reviewer {
+    model: opus
+    permissions: autonomous
+    phase: 3
+    join: all
+    description: "Reviews all changes for correctness. Routes fixes back to the specific engineer(s) who need to address them — up to 2 fix rounds before escalating."
+    tools: [Read, Grep, Glob, Bash]
+    outputs: {
+      verdict: approved | needs-frontend-fix | needs-backend-fix | needs-both-fix
+    }
+    prompt {
+      You are a senior engineering reviewer performing a final quality check on a performance sprint.
+
+      Project root: /home/ubuntu/.openclaw/workspace/amz-free-shiping
+      Branch: ITZ-54-feat/perf-and-ux-improvements
+
+      Review ALL of the following:
+
+      1. frontend/app/page.tsx — verify:
+         - fetch calls use Promise.all() (not sequential awaits)
+         - AbortController with 60s timeout is wired to both fetches
+         - Suggestions section shows a skeleton while fillToThresholdResult is null/loading
+         - Image error handler no longer uses display:none or hardcoded CSS class
+
+      2. backend/internal/checker/fill_to_threshold_service.go — verify:
+         - Decodo and scraper alternative fetches are gated on len(res.Alternatives) == 0
+         - No duplicate calls when alternatives already exist
+
+      3. backend/internal/checker/decodo.go — verify:
+         - Free shipping check uses strings.ToLower() and a single Contains
+
+      Also run:
+        cd /home/ubuntu/.openclaw/workspace/amz-free-shiping/backend && go vet ./...
+
+      For each file, report PASS / FAIL per expected change, any regressions, and quality issues.
+
+      Output your verdict as one of:
+        verdict=approved           — all checks pass, no issues
+        verdict=needs-frontend-fix — only frontend/page.tsx has issues
+        verdict=needs-backend-fix  — only Go files have issues
+        verdict=needs-both-fix     — both sides have issues to address
+    }
+  }
+
+  agent reporter {
+    model: haiku
+    permissions: autonomous
+    phase: 4
+    description: "Writes a concise summary of all changes made, ready to paste into a PR description."
+    tools: [Read, Glob]
+    prompt {
+      You are a technical writer summarising a completed performance sprint.
+
+      Project root: /home/ubuntu/.openclaw/workspace/amz-free-shiping
+      Branch: ITZ-54-feat/perf-and-ux-improvements
+
+      Read the changed files and produce a short PR description in this format:
+
+      ## What changed
+      - [frontend] <change summary>
+      - [backend] <change summary>
+
+      ## Performance impact
+      - <measured or estimated improvement>
+
+      ## How to test
+      - <steps to verify each fix>
+
+      Keep it under 200 words.
+    }
+  }
+
+  flow {
+    coordinator -> [frontend-engineer, backend-engineer]
+
+    # Engineers consult each other if they hit a cross-cutting interface issue
+    frontend-engineer -> qa-reviewer          [when frontend-engineer.status == done]
+    frontend-engineer -> backend-engineer     [when frontend-engineer.status == needs-backend-consultation, max 1]
+    backend-engineer  -> qa-reviewer          [when backend-engineer.status == done]
+    backend-engineer  -> frontend-engineer    [when backend-engineer.status == needs-frontend-consultation, max 1]
+
+    # QA routes fixes back to the right engineer — max 2 fix rounds each
+    qa-reviewer -> reporter                             [when qa-reviewer.verdict == approved]
+    qa-reviewer -> frontend-engineer                    [when qa-reviewer.verdict == needs-frontend-fix, max 2]
+    qa-reviewer -> backend-engineer                     [when qa-reviewer.verdict == needs-backend-fix, max 2]
+    qa-reviewer -> [frontend-engineer, backend-engineer] [when qa-reviewer.verdict == needs-both-fix, max 2]
+  }
+}

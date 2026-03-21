@@ -32,10 +32,21 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(backendUrl, { method: "GET", cache: "no-store" });
-    const body = await res.json();
+    const raw = await res.text();
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json(
+        { error: "backend_invalid_response" },
+        { status: 502 }
+      );
+    }
+
     // Strip internal details before sending to client
     delete body.method;
-    if (body.signal) {
+    if (typeof body.signal === "string") {
       body.signal = body.signal.replace(/decodo/gi, "proxy");
     }
     return NextResponse.json(body, { status: res.status });
