@@ -281,7 +281,10 @@ func parseSearchResult(sel *goquery.Selection) Alternative {
 	deliveryText := strings.ToLower(strings.TrimSpace(
 		sel.Find(".a-color-base.a-text-bold, .s-align-children-center span, [data-cy='delivery-recipe'] span, .s-free-shipping-badge, [class*='delivery'] span").Text(),
 	))
-	alt.FreeShipping = strings.Contains(deliveryText, "free")
+	alt.FreeShipping = strings.Contains(deliveryText, "free shipping") ||
+		strings.Contains(deliveryText, "free delivery") ||
+		strings.Contains(deliveryText, "free standard shipping") ||
+		strings.Contains(deliveryText, "free next-day delivery")
 
 	// Product URL
 	if len(alt.ASIN) == 10 {
