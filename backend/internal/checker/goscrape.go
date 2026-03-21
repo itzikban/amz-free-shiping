@@ -67,6 +67,10 @@ func (s *Service) GoScrapeAlternatives(ctx context.Context, query string) ([]Alt
 func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) ([]Alternative, error) {
 	// Trim query to first 5 words — long product titles hurt Amazon search relevance.
 	searchQuery = trimToWords(searchQuery, 5)
+	searchQuery = strings.TrimSpace(searchQuery)
+	if searchQuery == "" {
+		return nil, fmt.Errorf("goscrape: empty search query")
+	}
 	baseURL := "https://www.amazon.com/s?k=" + url.QueryEscape(searchQuery) + "&ref=nb_sb_noss"
 
 	type pageResult struct {
@@ -122,6 +126,17 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 			if err != nil {
 				results <- pageResult{err: fmt.Errorf("read body error: %w", err), page: p}
 				return
+			}
+
+			// Detect Amazon anti-bot / CAPTCHA challenge pages before parsing.
+			bodyLower := strings.ToLower(string(bodyBytes))
+			antiBotMarkers := []string{"captcha", "robot check", "enter the characters you see", "type the characters", "to discuss automated access"}
+			for _, marker := range antiBotMarkers {
+				if strings.Contains(bodyLower, marker) {
+					log.Printf("[GOSCRAPE] page %d: anti-bot challenge detected (marker: %q)", p, marker)
+					results <- pageResult{page: p, err: fmt.Errorf("anti-bot challenge detected on page %d", p)}
+					return
+				}
 			}
 
 			log.Printf("[GOSCRAPE] page %d: HTTP %d, body %d bytes", p, resp.StatusCode, len(bodyBytes))
