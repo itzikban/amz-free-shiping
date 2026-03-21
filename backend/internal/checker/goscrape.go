@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,9 +17,48 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/proxy"
 )
 
 var reASINFromHref = regexp.MustCompile(`/dp/([A-Z0-9]{10})`)
+
+// goScrapeHTTPClient returns an http.Client that routes through the SOCKS5
+// proxy specified by GOSCRAPE_PROXY (e.g. socks5://user@host:port), or a
+// plain client if the env var is unset.
+func goScrapeHTTPClient() *http.Client {
+	proxyAddr := os.Getenv("GOSCRAPE_PROXY")
+	if proxyAddr == "" {
+		return &http.Client{Timeout: 15 * time.Second}
+	}
+
+	u, err := url.Parse(proxyAddr)
+	if err != nil {
+		log.Printf("[GOSCRAPE] invalid GOSCRAPE_PROXY %q: %v — using direct", proxyAddr, err)
+		return &http.Client{Timeout: 15 * time.Second}
+	}
+
+	var auth *proxy.Auth
+	if u.User != nil {
+		auth = &proxy.Auth{User: u.User.Username()}
+		if pw, ok := u.User.Password(); ok {
+			auth.Password = pw
+		}
+	}
+
+	dialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
+	if err != nil {
+		log.Printf("[GOSCRAPE] SOCKS5 setup failed: %v — using direct", err)
+		return &http.Client{Timeout: 15 * time.Second}
+	}
+
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.(proxy.ContextDialer).DialContext(ctx, network, addr)
+		},
+	}
+	log.Printf("[GOSCRAPE] using SOCKS5 proxy: %s", u.Host)
+	return &http.Client{Transport: transport, Timeout: 15 * time.Second}
+}
 
 // GoScrapeAlternatives is the exported wrapper around goScrapeAlternatives.
 func (s *Service) GoScrapeAlternatives(ctx context.Context, query string) ([]Alternative, error) {
@@ -62,7 +103,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 			req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 			req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 
-			resp, err := s.Client.Do(req)
+			resp, err := goScrapeHTTPClient().Do(req)
 			if err != nil {
 				results <- pageResult{err: err}
 				return
