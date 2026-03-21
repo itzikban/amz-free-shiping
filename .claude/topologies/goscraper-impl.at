@@ -1,0 +1,278 @@
+topology goscraper-impl : [pipeline] {
+  meta {
+    version: "1.0.0"
+    description: "Autonomously implements goscrape (direct Amazon scraper, no PA-API), validates with a live scrape test, builds, tests, and pushes to feat/goscraper-integration. Opus writes and fixes code. Loop until green."
+    domain: engineering
+    timeout: 4h
+  }
+
+  agent branch-creator {
+    model: haiku
+    permissions: autonomous
+    phase: 1
+    description: "Creates the feat/goscraper-integration branch off current main and confirms success."
+    tools: [Bash]
+    prompt {
+      You are a git branch agent. Create the implementation branch and confirm success.
+
+      Steps:
+      1. Check current branch:
+           git branch --show-current
+
+      2. Create and checkout the new branch:
+           git checkout -b feat/goscraper-integration
+
+      3. Confirm:
+           git branch --show-current
+
+      Print "Branch feat/goscraper-integration ready." and stop.
+    }
+  }
+
+  agent goscraper-implementer {
+    model: opus
+    permissions: autonomous
+    phase: 2
+    description: "Writes all Go code for the goscrape method: goscrape.go, cmd/goscrape-test/main.go, and edits to checker.go and fill_to_threshold_service.go."
+    tools: [Read, Edit, Write, Grep, Glob, Bash]
+    outputs: {
+      status: done | error
+    }
+    prompt {
+      You are an expert Go engineer implementing a direct Amazon scraper called "goscrape".
+      Use Read/Edit/Write/Grep/Glob tools for ALL file operations. Only use Bash for go commands.
+      Do NOT use python3, sed, awk, or echo for file edits — use the Edit and Write tools only.
+
+      ## Task overview
+      Create goscrape.go, cmd/goscrape-test/main.go, and edit checker.go and fill_to_threshold_service.go.
+
+      ## File 1: backend/internal/checker/goscrape.go (CREATE)
+
+      Create this file with the following implementation:
+
+      Package: checker
+      Import: "context", "fmt", "log", "net/http", "net/url", "strings", "sync", "time", "github.com/PuerkitoBio/goquery"
+
+      Function signature:
+        func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) ([]Alternative, error)
+
+      Implementation details:
+      - Build Amazon search URL: https://www.amazon.com/s?k=<url-encoded-query>&ref=nb_sb_noss
+      - Concurrent multi-page fetch: pages 1-2 in parallel, semaphore of 3 workers max
+        Use a sync.WaitGroup + buffered channel for results (NOT golang.org/x/sync/semaphore)
+      - For each page:
+        - HTTP GET with User-Agent: "Mozilla/5.0 (compatible; goscrape/1.0)"
+        - 10 second timeout per request (use a derived context with deadline)
+        - Parse HTML with goquery
+        - Select product containers: div[data-cy='title-recipe'], div[data-component-type='s-search-result']
+        - For each container:
+          - ASIN: data-asin attr (primary) → extract from href with /dp/([A-Z0-9]{10}) regex (fallback)
+          - Title: a.a-link-normal h2 span, then h2 span
+          - Price: span.a-price span.a-offscreen (first match), then .a-price-whole + .a-price-fraction
+          - Image: img.s-image src attr
+          - Free shipping: strings.Contains(strings.ToLower(containerHTML), "free shipping")
+          - Product URL: https://www.amazon.com/dp/<ASIN>
+        - Only keep items where ASIN is exactly 10 chars and price > 0
+      - Deduplicate by ASIN across pages
+      - Return max 5 results as []Alternative
+      - Return error only if zero results from both pages (not per-page errors)
+
+      After collecting results, print a markdown table log:
+        log.Printf("[GOSCRAPE] === Search Results: %q ===\n%s\n[GOSCRAPE] Found %d/%d valid alternatives",
+          searchQuery, mdTable, len(results), totalSeen)
+      where mdTable is:
+        "| # | ASIN       | Title                        | Price  | Free |\n|---|------------|------------------------------|--------|------|\n" + rows
+
+      ## File 2: backend/cmd/goscrape-test/main.go (CREATE)
+
+      Standalone smoke-test CLI tool. Create directory backend/cmd/goscrape-test/ and write main.go:
+
+      Package: main
+      Usage: go run ./cmd/goscrape-test/ [query]
+      - Default query if not provided: "wireless earbuds"
+      - Create a checker.Service with checker.New()
+      - Call s.GoScrapeAlternatives(ctx, query) — NOTE: make GoScrapeAlternatives public (capital G)
+        OR keep it private and call it via a thin exported wrapper function in goscrape.go
+      - Print each result: ASIN, title, price, free shipping, URL
+      - Exit 0 if ≥1 result found, exit 1 if 0 results or error
+
+      IMPORTANT: Since goScrapeAlternatives is a private method, add a thin public wrapper in goscrape.go:
+        func (s *Service) GoScrapeAlternatives(ctx context.Context, query string) ([]Alternative, error) {
+          return s.goScrapeAlternatives(ctx, query)
+        }
+
+      ## File 3: backend/internal/checker/checker.go (MODIFY)
+
+      Read the file first. Find the switch statement in enrichWithAlternatives (around line 122).
+      Add a "goscrape" case BEFORE the "default" case:
+
+        case "goscrape":
+          log.Printf("[DEBUG] Using goScrape to fetch alternatives for: %s", res.Title[:min(50, len(res.Title))])
+          alts, err = s.goScrapeAlternatives(ctx, res.Title)
+          if err != nil {
+            log.Printf("[DEBUG] goScrape: search failed: %v", err)
+          } else {
+            log.Printf("[DEBUG] goScrape: found %d alternatives", len(alts))
+          }
+
+      ## File 4: backend/internal/checker/fill_to_threshold_service.go (MODIFY)
+
+      Read the file first. Find the fallback chain (around line 36 — the scrapeAmazonAlternatives block).
+      Insert a goScrapeAlternatives call BETWEEN the Decodo block and the scrapeAmazonAlternatives block:
+
+        // After the Decodo block and before the scrapeAmazonAlternatives block, insert:
+        if len(alts) == 0 && res.Title != "" {
+          if goAlts, gerr := s.goScrapeAlternatives(ctx, res.Title); gerr == nil && len(goAlts) > 0 {
+            alts = goAlts
+          }
+        }
+
+      ## After writing all files:
+      - Run: go build ./... (from backend directory: cd /home/ubuntu/.openclaw/workspace/amz-free-shiping/backend && go build ./...)
+      - If build succeeds → output status=done
+      - If build fails → output status=error with the error message
+    }
+  }
+
+  agent scraper-validator {
+    model: sonnet
+    permissions: autonomous
+    phase: 3
+    description: "Runs the goscrape-test CLI tool live against Amazon to verify the scraper returns real results. Distinguishes implementation bugs from CAPTCHA blocks."
+    tools: [Bash]
+    outputs: {
+      status: works | broken | captcha_blocked
+    }
+    prompt {
+      You are a live scraper validator. Run the goscrape-test command and verify it works.
+
+      Step 1 — Run the smoke test:
+        cd /home/ubuntu/.openclaw/workspace/amz-free-shiping/backend && go run ./cmd/goscrape-test/ "wireless earbuds"
+
+      Step 2 — Analyze output:
+      - If output contains ≥1 result with a valid ASIN (10 alphanumeric chars) and price > 0:
+        → output status=works
+      - If output contains "CAPTCHA", "Robot Check", "captcha", or "Sorry, we just need to make sure":
+        → output status=captcha_blocked (not an implementation bug — Amazon is blocking)
+      - If command exits with error, panic, or 0 results with no CAPTCHA signals:
+        → output status=broken with a description of what went wrong
+    }
+  }
+
+  agent builder-tester {
+    model: haiku
+    permissions: autonomous
+    phase: 4
+    description: "Runs go build and go test to verify the implementation compiles and all tests pass."
+    tools: [Bash]
+    outputs: {
+      status: green | red
+    }
+    prompt {
+      You are a build and test runner. Verify the Go code compiles and tests pass.
+
+      Step 1 — Build:
+        cd /home/ubuntu/.openclaw/workspace/amz-free-shiping/backend && go build ./...
+
+      Step 2 — Test:
+        cd /home/ubuntu/.openclaw/workspace/amz-free-shiping/backend && go test ./internal/checker/... -timeout 60s
+
+      If both succeed (exit code 0):
+        output status=green
+
+      If either fails:
+        output status=red
+        Print the full error output so the fixer can read it.
+    }
+  }
+
+  agent goscraper-fixer {
+    model: opus
+    permissions: autonomous
+    phase: 5
+    description: "Reads build/test error output and fixes the Go code. Uses Read/Edit/Write tools only — never python3/sed/awk for file edits."
+    tools: [Read, Edit, Write, Grep, Glob, Bash]
+    outputs: {
+      status: fixed
+    }
+    prompt {
+      You are an expert Go fixer. You receive build or test error output. Read the error, find the root cause, and fix it.
+
+      Rules:
+      - Use the Read tool to read files, NOT cat or head via Bash.
+      - Use the Edit tool to modify files, NOT sed, awk, or python3 via Bash.
+      - Use the Write tool to create new files, NOT echo or heredocs via Bash.
+      - Use the Grep tool to search file contents, NOT grep via Bash.
+      - Use the Glob tool to find files, NOT find via Bash.
+      - Only use Bash for: go build, go test.
+      - Never use python3 -c with multi-line strings. Never chain commands with $() substitution.
+
+      Steps:
+      1. Read the error output carefully.
+      2. Use Glob/Grep to find the relevant source files.
+      3. Use Read to read the full file content.
+      4. Use Edit to apply targeted fixes.
+      5. Do NOT re-run tests — builder-tester does that.
+
+      After applying all fixes, output status=fixed.
+    }
+  }
+
+  agent goscraper-commit-pusher {
+    model: haiku
+    permissions: autonomous
+    phase: 6
+    description: "Stages the new goscraper files, commits with a descriptive message, and pushes the feat/goscraper-integration branch."
+    tools: [Bash]
+    prompt {
+      You are a git commit agent. Stage specific files, commit, and push.
+
+      Step 1 — Stage only the relevant files:
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping add backend/internal/checker/goscrape.go
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping add backend/cmd/goscrape-test/
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping add backend/internal/checker/checker.go
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping add backend/internal/checker/fill_to_threshold_service.go
+
+      Step 2 — Check status:
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping status --porcelain
+
+      Step 3 — Commit:
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping commit -m "feat: add goscrape method for Amazon alternatives (no PA-API required)
+
+      Direct Amazon scraper using goquery CSS selectors. Adds goscrape as:
+      - ALT_FETCH_METHOD=goscrape case in enrichWithAlternatives
+      - Second fallback in BuildFillToThresholdForURL (between Decodo and scrapeAmazonAlternatives)
+      - cmd/goscrape-test/ CLI for live smoke testing
+
+      Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+
+      Step 4 — Push:
+        git -C /home/ubuntu/.openclaw/workspace/amz-free-shiping push -u origin feat/goscraper-integration
+
+      Print "Pushed feat/goscraper-integration — ready for review." and stop.
+    }
+  }
+
+  action done {
+    kind: report
+    description: "goscraper implementation complete — feat/goscraper-integration branch pushed and ready for PR."
+  }
+
+  flow {
+    branch-creator -> goscraper-implementer
+
+    goscraper-implementer -> scraper-validator       [when goscraper-implementer.status == done]
+    goscraper-implementer -> goscraper-fixer         [when goscraper-implementer.status == error, max 1]
+
+    scraper-validator -> builder-tester              [when scraper-validator.status == works]
+    scraper-validator -> builder-tester              [when scraper-validator.status == captcha_blocked]
+    scraper-validator -> goscraper-fixer             [when scraper-validator.status == broken, max 3]
+
+    builder-tester -> goscraper-commit-pusher        [when builder-tester.status == green]
+    builder-tester -> goscraper-fixer                [when builder-tester.status == red, max 5]
+
+    goscraper-fixer -> builder-tester                [max 5]
+
+    goscraper-commit-pusher -> done
+  }
+}

@@ -1,7 +1,6 @@
 package checker
 
 import (
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -21,6 +20,9 @@ import (
 
 var reASINFromHref = regexp.MustCompile(`/dp/([A-Z0-9]{10})`)
 
+// goscrapeDebug enables verbose response body logging when GOSCRAPE_DEBUG=1.
+var goscrapeDebug = os.Getenv("GOSCRAPE_DEBUG") == "1"
+
 // goScrapeHTTPClient returns an http.Client whose outbound connections are
 // bound to GOSCRAPE_BIND_IP (the WireGuard interface IP), so only goscrape
 // traffic exits through the VPN tunnel. Falls back to direct if unset.
@@ -29,7 +31,12 @@ func goScrapeHTTPClient() *http.Client {
 	if bindIP == "" {
 		return &http.Client{Timeout: 15 * time.Second}
 	}
-	localAddr := &net.TCPAddr{IP: net.ParseIP(bindIP)}
+	parsedIP := net.ParseIP(bindIP)
+	if parsedIP == nil {
+		log.Printf("[GOSCRAPE] invalid GOSCRAPE_BIND_IP %q, falling back to plain client", bindIP)
+		return &http.Client{Timeout: 15 * time.Second}
+	}
+	localAddr := &net.TCPAddr{IP: parsedIP}
 	dialer := &net.Dialer{LocalAddr: localAddr, Timeout: 10 * time.Second}
 	transport := &http.Transport{
 		DialContext: dialer.DialContext,
@@ -70,9 +77,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 				pageURL = fmt.Sprintf("%s&page=%d", baseURL, p)
 			}
 
-			// Use a fresh context so a near-expired parent (after Decodo+scraper retries)
-			// doesn't immediately cancel our request.
-			reqCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 			defer cancel()
 
 			req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, pageURL, nil)
@@ -83,7 +88,6 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 			req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 			req.Header.Set("Accept-Language", "en-US,en;q=0.5")
-			req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 
 			resp, err := goScrapeHTTPClient().Do(req)
 			if err != nil {
@@ -98,31 +102,21 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 				return
 			}
 
-			// Handle gzip-encoded response bodies
-			var bodyReader io.Reader = resp.Body
-			if resp.Header.Get("Content-Encoding") == "gzip" {
-				gz, gzErr := gzip.NewReader(resp.Body)
-				if gzErr != nil {
-					results <- pageResult{err: fmt.Errorf("gzip decode error: %w", gzErr)}
-					return
-				}
-				defer gz.Close()
-				bodyReader = gz
-			}
-
 			// Read full body for debug logging and parsing
-			bodyBytes, err := io.ReadAll(bodyReader)
+			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				results <- pageResult{err: fmt.Errorf("read body error: %w", err)}
 				return
 			}
 
-			// Debug: log first 2000 chars of the response body
-			preview := string(bodyBytes)
-			if len(preview) > 2000 {
-				preview = preview[:2000]
+			log.Printf("[GOSCRAPE] page %d: HTTP %d, body %d bytes", p, resp.StatusCode, len(bodyBytes))
+			if goscrapeDebug {
+				preview := string(bodyBytes)
+				if len(preview) > 2000 {
+					preview = preview[:2000]
+				}
+				log.Printf("[GOSCRAPE] page %d response preview:\n%s", p, preview)
 			}
-			log.Printf("[GOSCRAPE] page %d response preview (%d bytes total):\n%s", p, len(bodyBytes), preview)
 
 			doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(bodyBytes)))
 			if err != nil {

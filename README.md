@@ -70,13 +70,16 @@ AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
 
-# 5. Bring up the tunnel
+# 5. Clean up temporary key files (must run AFTER config is written above)
+shred -u /tmp/wg-private.key /tmp/wg-public.key 2>/dev/null || rm -f /tmp/wg-private.key /tmp/wg-public.key
+
+# 6. Bring up the tunnel
 sudo wg-quick up mullvad-nyc
 
-# 6. Enable auto-start on boot
+# 7. Enable auto-start on boot
 sudo systemctl enable wg-quick@mullvad-nyc
 
-# 7. Set the WireGuard IP in backend/.env
+# 8. Set the WireGuard IP in backend/.env
 echo "GOSCRAPE_BIND_IP=10.x.x.x" >> backend/.env
 ```
 

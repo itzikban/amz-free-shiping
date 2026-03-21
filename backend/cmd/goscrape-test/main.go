@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"free-ship-checker-go/internal/checker"
 )
@@ -16,7 +17,8 @@ func main() {
 	}
 
 	s := checker.New()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	alts, err := s.GoScrapeAlternatives(ctx, query)
 	if err != nil {
