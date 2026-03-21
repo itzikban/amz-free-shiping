@@ -58,6 +58,28 @@ func TestParseSearchResult(t *testing.T) {
 			wantFreeship: false,
 		},
 		{
+			name: "malformed price falls back to zero",
+			html: `<div data-component-type="s-search-result" data-asin="B09BADPRC0">
+				<h2><a><span>Malformed Price Item</span></a></h2>
+				<span class="a-price"><span class="a-offscreen">$--</span></span>
+				<img class="s-image" src="https://images.example.com/bad.jpg" />
+			</div>`,
+			wantASIN:     "B09BADPRC0",
+			wantTitle:    "Malformed Price Item",
+			wantPrice:    0.0,
+			wantImage:    "https://images.example.com/bad.jpg",
+			wantFreeship: false,
+		},
+		{
+			name:         "empty selection returns zero-value alternative",
+			html:         `<div class="unrelated">no search result</div>`,
+			wantASIN:     "",
+			wantTitle:    "",
+			wantPrice:    0.0,
+			wantImage:    "",
+			wantFreeship: false,
+		},
+		{
 			name: "non-free delivery text does not set FreeShipping",
 			html: `<div data-component-type="s-search-result" data-asin="B09NOFREE0">
 				<h2><a><span>Standard Delivery Item</span></a></h2>
