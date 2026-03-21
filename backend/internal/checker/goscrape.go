@@ -17,46 +17,24 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/net/proxy"
 )
 
 var reASINFromHref = regexp.MustCompile(`/dp/([A-Z0-9]{10})`)
 
-// goScrapeHTTPClient returns an http.Client that routes through the SOCKS5
-// proxy specified by GOSCRAPE_PROXY (e.g. socks5://user@host:port), or a
-// plain client if the env var is unset.
+// goScrapeHTTPClient returns an http.Client whose outbound connections are
+// bound to GOSCRAPE_BIND_IP (the WireGuard interface IP), so only goscrape
+// traffic exits through the VPN tunnel. Falls back to direct if unset.
 func goScrapeHTTPClient() *http.Client {
-	proxyAddr := os.Getenv("GOSCRAPE_PROXY")
-	if proxyAddr == "" {
+	bindIP := os.Getenv("GOSCRAPE_BIND_IP")
+	if bindIP == "" {
 		return &http.Client{Timeout: 15 * time.Second}
 	}
-
-	u, err := url.Parse(proxyAddr)
-	if err != nil {
-		log.Printf("[GOSCRAPE] invalid GOSCRAPE_PROXY %q: %v — using direct", proxyAddr, err)
-		return &http.Client{Timeout: 15 * time.Second}
-	}
-
-	var auth *proxy.Auth
-	if u.User != nil {
-		auth = &proxy.Auth{User: u.User.Username()}
-		if pw, ok := u.User.Password(); ok {
-			auth.Password = pw
-		}
-	}
-
-	dialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
-	if err != nil {
-		log.Printf("[GOSCRAPE] SOCKS5 setup failed: %v — using direct", err)
-		return &http.Client{Timeout: 15 * time.Second}
-	}
-
+	localAddr := &net.TCPAddr{IP: net.ParseIP(bindIP)}
+	dialer := &net.Dialer{LocalAddr: localAddr, Timeout: 10 * time.Second}
 	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer.(proxy.ContextDialer).DialContext(ctx, network, addr)
-		},
+		DialContext: dialer.DialContext,
 	}
-	log.Printf("[GOSCRAPE] using SOCKS5 proxy: %s", u.Host)
+	log.Printf("[GOSCRAPE] binding to WireGuard IP %s", bindIP)
 	return &http.Client{Transport: transport, Timeout: 15 * time.Second}
 }
 
