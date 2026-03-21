@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sort"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,26 +24,38 @@ var reASINFromHref = regexp.MustCompile(`/dp/([A-Z0-9]{10})`)
 // goscrapeDebug enables verbose response body logging when GOSCRAPE_DEBUG=1.
 var goscrapeDebug = os.Getenv("GOSCRAPE_DEBUG") == "1"
 
-// goScrapeHTTPClient returns an http.Client whose outbound connections are
+// goScrapeClientOnce ensures the shared HTTP client is initialized exactly once.
+var goScrapeClientOnce sync.Once
+
+// goScrapeSharedClient holds the singleton HTTP client for goscrape requests,
+// preserving connection pooling across calls.
+var goScrapeSharedClient *http.Client
+
+// goScrapeHTTPClient returns a shared http.Client whose outbound connections are
 // bound to GOSCRAPE_BIND_IP (the WireGuard interface IP), so only goscrape
 // traffic exits through the VPN tunnel. Falls back to direct if unset.
+// The client is created once and reused to preserve keep-alive connection pooling.
 func goScrapeHTTPClient() *http.Client {
-	bindIP := os.Getenv("GOSCRAPE_BIND_IP")
-	if bindIP == "" {
-		return &http.Client{Timeout: 15 * time.Second}
-	}
-	parsedIP := net.ParseIP(bindIP)
-	if parsedIP == nil {
-		log.Printf("[GOSCRAPE] invalid GOSCRAPE_BIND_IP %q, falling back to plain client", bindIP)
-		return &http.Client{Timeout: 15 * time.Second}
-	}
-	localAddr := &net.TCPAddr{IP: parsedIP}
-	dialer := &net.Dialer{LocalAddr: localAddr, Timeout: 10 * time.Second}
-	transport := &http.Transport{
-		DialContext: dialer.DialContext,
-	}
-	log.Printf("[GOSCRAPE] binding to WireGuard IP %s", bindIP)
-	return &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	goScrapeClientOnce.Do(func() {
+		bindIP := os.Getenv("GOSCRAPE_BIND_IP")
+		if bindIP == "" {
+			goScrapeSharedClient = &http.Client{Timeout: 15 * time.Second}
+			return
+		}
+		parsedIP := net.ParseIP(bindIP)
+		if parsedIP == nil {
+			log.Printf("[GOSCRAPE] invalid GOSCRAPE_BIND_IP %q, falling back to plain client", bindIP)
+			goScrapeSharedClient = &http.Client{Timeout: 15 * time.Second}
+			return
+		}
+		localAddr := &net.TCPAddr{IP: parsedIP}
+		dialer := &net.Dialer{LocalAddr: localAddr, Timeout: 10 * time.Second}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.DialContext = dialer.DialContext
+		log.Printf("[GOSCRAPE] binding to WireGuard IP %s", bindIP)
+		goScrapeSharedClient = &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	})
+	return goScrapeSharedClient
 }
 
 // GoScrapeAlternatives is the exported wrapper around goScrapeAlternatives.
@@ -58,6 +71,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 	type pageResult struct {
 		alts []Alternative
 		err  error
+		page int
 	}
 
 	pages := []int{1, 2}
@@ -82,7 +96,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 
 			req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, pageURL, nil)
 			if err != nil {
-				results <- pageResult{err: err}
+				results <- pageResult{err: err, page: p}
 				return
 			}
 			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -91,21 +105,21 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 
 			resp, err := goScrapeHTTPClient().Do(req)
 			if err != nil {
-				results <- pageResult{err: err}
+				results <- pageResult{err: err, page: p}
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
 				log.Printf("[GOSCRAPE] page %d: HTTP %d (Amazon may be blocking this IP/environment)", p, resp.StatusCode)
-				results <- pageResult{err: fmt.Errorf("HTTP %d for page %d", resp.StatusCode, p)}
+				results <- pageResult{err: fmt.Errorf("HTTP %d for page %d", resp.StatusCode, p), page: p}
 				return
 			}
 
 			// Read full body for debug logging and parsing
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				results <- pageResult{err: fmt.Errorf("read body error: %w", err)}
+				results <- pageResult{err: fmt.Errorf("read body error: %w", err), page: p}
 				return
 			}
 
@@ -120,7 +134,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 
 			doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(bodyBytes)))
 			if err != nil {
-				results <- pageResult{err: err}
+				results <- pageResult{err: err, page: p}
 				return
 			}
 
@@ -139,7 +153,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 				}
 			})
 
-			results <- pageResult{alts: alts}
+			results <- pageResult{alts: alts, page: p}
 		}(page)
 	}
 
@@ -148,14 +162,28 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 		close(results)
 	}()
 
+	// Collect all page results, then sort by page ascending so page-1
+	// results take priority during dedup.
+	var collected []pageResult
+	var pageErrors []string
+
+	for pr := range results {
+		if pr.err != nil {
+			pageErrors = append(pageErrors, fmt.Sprintf("page %d: %v", pr.page, pr.err))
+			continue
+		}
+		collected = append(collected, pr)
+	}
+
+	sort.Slice(collected, func(i, j int) bool {
+		return collected[i].page < collected[j].page
+	})
+
 	seen := make(map[string]bool)
 	var allAlts []Alternative
 	totalSeen := 0
 
-	for pr := range results {
-		if pr.err != nil {
-			continue
-		}
+	for _, pr := range collected {
 		for _, a := range pr.alts {
 			totalSeen++
 			if !seen[a.ASIN] {
@@ -183,6 +211,9 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 		searchQuery, mdTable, len(allAlts), totalSeen)
 
 	if len(allAlts) == 0 {
+		if len(pageErrors) > 0 {
+			return nil, fmt.Errorf("goscrape: no results for %q; page errors: %s", searchQuery, strings.Join(pageErrors, "; "))
+		}
 		return nil, fmt.Errorf("goscrape: no results for %q", searchQuery)
 	}
 
@@ -245,9 +276,12 @@ func parseSearchResult(sel *goquery.Selection) Alternative {
 	// Image
 	alt.ImageURL, _ = sel.Find("img.s-image").Attr("src")
 
-	// Free shipping
-	containerHTML, _ := sel.Html()
-	alt.FreeShipping = strings.Contains(strings.ToLower(containerHTML), "free shipping")
+	// Free shipping: use targeted selectors for the delivery/shipping text node
+	// instead of scanning the entire container HTML which can match unrelated markup.
+	deliveryText := strings.ToLower(strings.TrimSpace(
+		sel.Find(".a-color-base.a-text-bold, .s-align-children-center span, [data-cy='delivery-recipe'] span, .s-free-shipping-badge, [class*='delivery'] span").Text(),
+	))
+	alt.FreeShipping = strings.Contains(deliveryText, "free")
 
 	// Product URL
 	if len(alt.ASIN) == 10 {
