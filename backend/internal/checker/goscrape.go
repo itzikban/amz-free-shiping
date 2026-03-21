@@ -1,16 +1,17 @@
 package checker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
-	"sort"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -132,7 +133,7 @@ func (s *Service) goScrapeAlternatives(ctx context.Context, searchQuery string) 
 				log.Printf("[GOSCRAPE] page %d response preview:\n%s", p, preview)
 			}
 
-			doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(bodyBytes)))
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(bodyBytes))
 			if err != nil {
 				results <- pageResult{err: err, page: p}
 				return
